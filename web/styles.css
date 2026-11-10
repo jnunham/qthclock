@@ -1,0 +1,180 @@
+/* Everything is sized in rem, and the root font size follows the screen
+   width, so the same layout reads well from a 7" Pi screen to a 4K TV.
+   --scale is the user's "Text size" slider. */
+:root {
+  --scale: 1;
+  font-size: calc(clamp(12px, 0.55vw + 6px, 40px) * var(--scale));
+
+  --bg: #0a0f16;
+  --panel: #111923;
+  --panel-2: #172231;
+  --line: #233142;
+  --text: #e6edf3;
+  --muted: #8b9bb0;
+  --accent: #4dabf7;
+  --good: #51cf66;
+  --fair: #fcc419;
+  --poor: #ff6b6b;
+  --map-sea: #0b1622;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #e9edf2; --panel: #ffffff; --panel-2: #f3f6f9; --line: #d5dde6;
+  --text: #17202b; --muted: #5d6b7c; --accent: #1c7ed6; --map-sea: #dbe7f3;
+  --good: #2b8a3e; --fair: #b08800; --poor: #c92a2a;
+  color-scheme: light;
+}
+/* Night mode: everything red to keep your dark adaptation. */
+:root[data-theme="night"] {
+  --bg: #000; --panel: #0d0000; --panel-2: #160000; --line: #3a0a0a;
+  --text: #ff4d4d; --muted: #a33; --accent: #ff4d4d; --map-sea: #0a0000;
+  --good: #ff4d4d; --fair: #ff4d4d; --poor: #ff4d4d;
+}
+:root[data-theme="night"] #map { filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(4) brightness(0.6); }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+.muted { color: var(--muted); }
+.small { font-size: 0.8rem; }
+[hidden] { display: none !important; }
+
+#app { display: flex; flex-direction: column; height: 100vh; gap: 0.5rem; padding: 0.5rem; }
+
+/* ---------- top bar ---------- */
+#topbar {
+  display: flex; align-items: center; gap: 2rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0.6rem;
+  padding: 0.5rem 1rem;
+}
+.ident .call { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.04em; }
+.ident .grid { font-size: 0.9rem; }
+.demo { color: var(--fair); font-weight: 700; }
+.clock { margin-right: auto; }
+.clock .utc { font-size: 2.4rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.clock .sec { color: var(--muted); font-size: 0.6em; }
+.clock .z { color: var(--muted); font-size: 0.4em; vertical-align: super; }
+.clock .local { font-size: 0.9rem; margin-top: 0.2rem; }
+.solar { display: flex; gap: 1.2rem; }
+.stat { text-align: center; min-width: 3.5rem; }
+.stat .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.stat .value { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat.good .value { color: var(--good); }
+.stat.fair .value { color: var(--fair); }
+.stat.poor .value { color: var(--poor); }
+.status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; min-width: 12rem; justify-content: flex-end; }
+.dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--muted); }
+.dot.ok { background: var(--good); box-shadow: 0 0 0.5rem var(--good); }
+.dot.bad { background: var(--poor); }
+
+/* ---------- body layout ---------- */
+#body { flex: 1; min-height: 0; display: flex; gap: 0.5rem; }
+#body[data-side="right"] { flex-direction: row; }
+#body[data-side="bottom"] { flex-direction: column; }
+#map-wrap { flex: 1; min-width: 0; min-height: 0; position: relative; padding: 0; overflow: hidden; }
+#map { position: absolute; inset: 0; }
+#map canvas { display: block; }
+#side { display: flex; gap: 0.5rem; min-height: 0; min-width: 0; }
+#body[data-side="right"] #side { flex: 0 0 var(--side-size); flex-direction: column; }
+#body[data-side="bottom"] #side { flex: 0 0 var(--side-size); flex-direction: row; }
+
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0.6rem;
+  padding: 0.6rem 0.8rem; min-height: 0; display: flex; flex-direction: column;
+}
+.panel h2 { margin: 0 0 0.4rem; font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.map-note { position: absolute; left: 0.8rem; bottom: 0.5rem; font-size: 0.75rem; }
+
+/* ---------- side panels ---------- */
+#side > .panel { overflow: hidden; }
+#body[data-side="right"] #side > .panel { flex: 1 1 0; }
+#body[data-side="right"] #side > .dedx { flex: 0 0 auto; }
+#body[data-side="right"] #side > .dxspots { flex: 1.6 1 0; }
+#body[data-side="bottom"] #side > .panel { flex: 1 1 0; }
+#body[data-side="bottom"] #side > .dxspots { flex: 1.6 1 0; }
+.hint { font-size: 0.85rem; padding: 0.3rem 0; line-height: 1.4; }
+
+.chip {
+  display: inline-block; padding: 0.05rem 0.45rem; border-radius: 1rem; font-size: 0.8em; font-weight: 600;
+  color: var(--c, var(--text)); background: color-mix(in srgb, var(--c, var(--muted)) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c, var(--muted)) 45%, transparent);
+}
+
+/* DE / DX */
+.dedx { flex-direction: row !important; gap: 1rem; }
+.dedx .col { flex: 1; min-width: 0; }
+.dedx .col + .col { border-left: 1px solid var(--line); padding-left: 1rem; }
+.dedx h2 { display: flex; justify-content: space-between; }
+.dedx .clear { background: none; border: none; color: var(--muted); cursor: pointer; font: inherit; }
+.dedx .big { font-size: 1.5rem; font-weight: 700; letter-spacing: 0.03em; margin-bottom: 0.2rem; }
+.dedx .kv { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.85rem; }
+.dedx .path { display: flex; gap: 1rem; margin: 0.3rem 0 0.1rem; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+
+/* My signal / Heard here */
+.summary .rows { display: flex; flex-direction: column; gap: 0.05rem; overflow: hidden; }
+.srow { display: grid; grid-template-columns: 3.4rem 1fr 2rem 9.5rem 2.2rem; align-items: center; gap: 0.5rem; font-size: 0.82rem; line-height: 1.25; cursor: pointer; border-radius: 0.3rem; padding: 0 0.2rem; }
+.srow:hover { background: var(--panel-2); }
+.srow .track { height: 0.5rem; background: var(--panel-2); border-radius: 0.3rem; overflow: hidden; }
+.srow .fill { display: block; height: 100%; border-radius: 0.3rem; transition: width 0.6s ease; }
+.srow .n { text-align: right; font-variant-numeric: tabular-nums; }
+.srow .far { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem; }
+.summary h2 .count { text-transform: none; letter-spacing: 0; font-weight: 400; float: right; }
+
+/* DX near me */
+.dxspots h2 span { text-transform: none; letter-spacing: 0; font-weight: 400; float: right; }
+.dxspots .scroll { overflow: hidden; flex: 1; }
+.dxspots table { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.dxspots th { text-align: left; font-weight: 500; color: var(--muted); font-size: 0.75rem; padding: 0.2rem 0.35rem; border-bottom: 1px solid var(--line); }
+.dxspots td { padding: 0.2rem 0.35rem; border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent); white-space: nowrap; }
+.dxspots tbody tr { cursor: pointer; }
+.dxspots tbody tr:hover td { background: var(--panel-2); }
+.dxspots tr.sel td { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.dxspots .num { text-align: right; }
+.dxspots .call { font-weight: 600; }
+.dxspots tr.fresh td { animation: flash 1.2s ease-out; }
+@keyframes flash { from { background: color-mix(in srgb, var(--accent) 25%, transparent); } to { background: transparent; } }
+
+/* map legend */
+#legend { position: absolute; right: 0.6rem; top: 0.6rem; z-index: 2; display: flex; gap: 0.9rem; font-size: 0.78rem;
+  background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 0.25rem 0.6rem; border-radius: 0.4rem; border: 1px solid var(--line); }
+#legend span { display: flex; align-items: center; gap: 0.35rem; }
+#legend i { width: 0.6rem; height: 0.6rem; border-radius: 50%; display: inline-block; }
+#legend .ln-me, #legend .ln-here, #legend .ln-sel { width: 1.4rem; height: 0; border-radius: 0; border-top: 2px solid #a9e34b; }
+#legend .ln-here { border-top-style: dashed; }
+#legend .ln-sel { border-top: 3px solid var(--text); }
+#legend .dot-near { border: 2px solid #ffa94d; width: 0.55rem; height: 0.55rem; }
+
+/* ---------- settings ---------- */
+#gear {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 20;
+  width: 2.8rem; height: 2.8rem; border-radius: 50%; font-size: 1.4rem;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line); cursor: pointer;
+  transition: opacity 0.6s;
+}
+body.idle #gear { opacity: 0; }
+body.idle, body.idle * { cursor: none; }
+#drawer {
+  position: fixed; right: 1rem; bottom: 4.4rem; z-index: 20; width: min(26rem, 90vw); max-height: 80vh; overflow: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0.8rem; padding: 1rem 1.2rem;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.5); font-size: 0.95rem;
+}
+.drawer-head { display: flex; justify-content: space-between; align-items: center; }
+#drawer h2 { margin: 0; font-size: 1.1rem; }
+#drawer h3 { margin: 1rem 0 0.4rem; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+#drawer button { font: inherit; color: var(--text); cursor: pointer; }
+#drawer .close { background: none; border: none; font-size: 1.1rem; }
+.seg { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.seg button { background: var(--panel-2); border: 1px solid var(--line); border-radius: 0.4rem; padding: 0.3rem 0.7rem; }
+.seg button.on { border-color: var(--accent); color: var(--accent); }
+.checks { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 1rem; }
+.check { display: flex; align-items: center; gap: 0.4rem; }
+.row { display: flex; gap: 1rem; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+#drawer select { font: inherit; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 0.3rem; }
+#drawer input[type="range"] { width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.4rem 0; }
+#drawer .chip { opacity: 0.55; }
+#drawer .chip.on { opacity: 1; outline: 2px solid var(--c, var(--accent)); }
+
+/* MapLibre popups follow the theme */
+.maplibregl-popup-content { background: var(--panel); color: var(--text); font-size: 0.9rem; border: 1px solid var(--line); }
+.maplibregl-popup-tip { display: none; }

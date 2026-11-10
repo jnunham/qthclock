@@ -1,0 +1,43 @@
+{
+  "listen": ":8073",
+  "callsign": "N0CALL",
+  "grid": "FN31pr",
+  "webDir": "web",
+  "dataDir": "data",
+  "mapStyle": "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
+  "historyMinutes": 30,
+  "historyMax": 20000,
+
+  "pskreporter": {
+    "enabled": true,
+    "addr": "mqtt.pskreporter.info:1883",
+    "topics": [
+      "pskr/filter/v2/+/+/{CALL}/#",
+      "pskr/filter/v2/+/+/+/{CALL}/#"
+    ]
+  },
+  "wsjtx": {
+    "enabled": true,
+    "listen": "127.0.0.1:2237"
+  },
+  "nearKm": 1500,
+  "rbn": {
+    "enabled": true,
+    "addrs": ["telnet.reversebeacon.net:7000"]
+  },
+  "cluster": {
+    "enabled": false,
+    "addr": "dxc.nc7j.com:7373"
+  },
+  "solar": {
+    "enabled": true,
+    "intervalMinutes": 10
+  },
+  "cty": {
+    "url": "https://www.country-files.com/cty/cty.dat"
+  },
+  "demo": {
+    "enabled": false,
+    "rate": 4
+  }
+}

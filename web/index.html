@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QTHClock</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header id="topbar"></header>
+    <main id="body">
+      <section id="map-wrap" class="panel">
+        <div id="map"></div>
+        <div id="legend">
+          <span><i class="ln-me"></i>Hears me</span>
+          <span><i class="ln-here"></i>I hear</span>
+          <span><i class="dot-near"></i>DX near me</span>
+          <span><i class="ln-sel"></i>Selected DX</span>
+          <span class="muted">colour = band</span>
+        </div>
+      </section>
+      <aside id="side"></aside>
+    </main>
+  </div>
+  <button id="gear" title="Settings" aria-label="Settings">⚙</button>
+  <div id="drawer" hidden></div>
+  <script type="module" src="dist/main.js"></script>
+</body>
+</html>

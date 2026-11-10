@@ -166,6 +166,17 @@ func (h *Hub) loop() {
 	}
 }
 
+// Reset forgets all spots (used when the operator's call or grid changes) and
+// tells connected screens to clear theirs.
+func (h *Hub) Reset() {
+	h.mu.Lock()
+	h.history = nil
+	h.pending = nil
+	h.seen = map[string]int64{}
+	h.mu.Unlock()
+	h.broadcast(Event{Name: "snapshot", Data: []byte("[]")})
+}
+
 // Stats for the health endpoint.
 func (h *Hub) Stats() map[string]any {
 	h.mu.Lock()

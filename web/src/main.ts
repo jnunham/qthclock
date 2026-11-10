@@ -8,9 +8,14 @@ import { createMap } from "./panels/map.js";
 import { DeDx } from "./panels/dedx.js";
 import { BandSummary } from "./panels/bandsummary.js";
 import { DXSpots } from "./panels/dxspots.js";
+import { showSetup } from "./setup.js";
 
 async function main() {
   const cfg: ServerConfig = await fetch("api/config").then((r) => r.json());
+  if (!cfg.configured && !cfg.demo) {
+    await showSetup(cfg, true); // reloads the page once saved
+    return;
+  }
   let settings = loadSettings();
   const get = () => settings;
 
@@ -47,7 +52,7 @@ async function main() {
   };
   applyLayout();
 
-  initDrawer(get, (s: Settings) => {
+  initDrawer(get, () => showSetup(cfg, false), (s: Settings) => {
     settings = s;
     saveSettings(s);
     applyLayout();

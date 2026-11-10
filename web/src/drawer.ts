@@ -5,7 +5,7 @@ import { PRESETS, type Preset, type Settings, type Theme } from "./settings.js";
  * The settings drawer. Kept to one short screen on purpose: layout, what to
  * show, text size, and spot filters. Anything more belongs in config.json.
  */
-export function initDrawer(get: () => Settings, set: (s: Settings) => void): void {
+export function initDrawer(get: () => Settings, editStation: () => void, set: (s: Settings) => void): void {
   const gear = document.getElementById("gear")!;
   const drawer = document.getElementById("drawer")!;
 
@@ -15,6 +15,7 @@ export function initDrawer(get: () => Settings, set: (s: Settings) => void): voi
       `<label class="check"><input type="checkbox" data-show="${key}" ${s.show[key] ? "checked" : ""}> ${label}</label>`;
     drawer.innerHTML = `
       <div class="drawer-head"><h2>Display</h2><button class="close" aria-label="Close">✕</button></div>
+      <button class="station">Change callsign / grid…</button>
 
       <h3>Layout</h3>
       <div class="seg">${Object.entries(PRESETS).map(([k, p]) =>
@@ -58,6 +59,7 @@ export function initDrawer(get: () => Settings, set: (s: Settings) => void): voi
     const t = e.target as HTMLElement;
     const s = structuredClone(get());
     if (t.closest(".close")) { drawer.hidden = true; return; }
+    if (t.closest(".station")) { drawer.hidden = true; editStation(); return; }
     if (t.dataset.preset) s.preset = t.dataset.preset as Preset;
     else if (t.dataset.theme) s.theme = t.dataset.theme as Theme;
     else if (t.dataset.band) s.bands = toggle(s.bands, t.dataset.band);

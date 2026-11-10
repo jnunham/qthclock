@@ -38,6 +38,7 @@ export interface ServerConfig {
   mapStyle: string;
   demo: boolean;
   nearKm: number;
+  configured: boolean;
 }
 
 /** The station the operator is looking at (clicked on the map or a list). */

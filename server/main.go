@@ -32,73 +32,34 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	fileDemo := cfg.Demo.Enabled
 	if *demo {
 		cfg.Demo.Enabled = true
+	}
+	if !cfg.configured() && !cfg.Demo.Enabled && stdinIsTerminal() {
+		if err := promptStation(&cfg); err != nil {
+			log.Printf("setup: %v", err)
+		} else if err := saveConfig(*cfgPath, cfg, fileDemo); err != nil {
+			log.Fatalf("saving %s: %v", *cfgPath, err)
+		} else {
+			log.Printf("saved %s", *cfgPath)
+		}
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	hub := spots.NewHub(cfg.HistoryMax, time.Duration(cfg.HistoryMinutes)*time.Minute)
-
 	cty := geo.NewCTY()
 	go func() {
 		if err := cty.LoadOrFetch(filepath.Join(cfg.DataDir, "cty.dat"), cfg.CTY.URL); err != nil {
 			log.Printf("cty: %v (RBN/cluster spots won't have map positions until cty.dat is available)", err)
 		}
 	}()
-	loc := sources.Locator{CTY: cty}
 
-	// Everything goes through the relevance filter: only spots about me, heard
-	// by me, or spotted near me reach the display.
-	rel := sources.Relevance{Call: cfg.Callsign, NearKm: cfg.NearKm}
-	if la, lo, ok := geo.GridToLatLon(cfg.Grid); ok {
-		rel.Lat, rel.Lon, rel.HasQTH = la, lo, true
-	} else {
-		log.Printf("no valid \"grid\" in config: \"near me\" DX spots are disabled")
-	}
-	if cfg.Callsign == "" {
-		log.Printf("no \"callsign\" in config: \"who hears me\" is disabled")
-	}
-	pub := func(s spots.Spot) {
-		if s, ok := rel.Tag(s); ok {
-			hub.Publish(s)
-		}
-	}
+	st := &station{cfg: cfg, path: *cfgPath, fileDemo: fileDemo, hub: hub, loc: sources.Locator{CTY: cty}, parent: ctx}
+	st.start()
 
-	if cfg.Demo.Enabled {
-		log.Printf("demo mode: generating %d fake spots/s", cfg.Demo.Rate)
-		if rel.Call == "" {
-			rel.Call = "N0CALL"
-		}
-		if !rel.HasQTH {
-			rel.Lat, rel.Lon, rel.HasQTH = 41.7, -72.7, true
-		}
-		go (&sources.Demo{Call: rel.Call, Grid: cfg.Grid, Pub: pub, Rate: cfg.Demo.Rate}).Run(ctx)
-	} else {
-		if cfg.PSKReporter.Enabled {
-			go (&sources.PSKReporter{Addr: cfg.PSKReporter.Addr, Topics: cfg.PSKReporter.Topics,
-				Call: cfg.Callsign, Pub: pub, Locator: loc}).Run(ctx)
-		}
-		if cfg.WSJTX.Enabled {
-			go (&sources.WSJTX{Listen: cfg.WSJTX.Listen, Call: cfg.Callsign, Grid: cfg.Grid, Pub: pub, Locator: loc}).Run(ctx)
-		}
-		needCall := func(name string) bool {
-			if cfg.Callsign == "" {
-				log.Printf("%s: skipped, set \"callsign\" in config to log in", name)
-				return false
-			}
-			return true
-		}
-		if cfg.RBN.Enabled && needCall("rbn") {
-			for _, a := range cfg.RBN.Addrs {
-				go (&sources.Telnet{Name: "rbn", Addr: a, Call: cfg.Callsign, Pub: pub, Locator: loc}).Run(ctx)
-			}
-		}
-		if cfg.Cluster.Enabled && needCall("cluster") {
-			go (&sources.Telnet{Name: "cluster", Addr: cfg.Cluster.Addr, Call: cfg.Callsign, Pub: pub, Locator: loc}).Run(ctx)
-		}
-	}
 	if cfg.Solar.Enabled {
 		go solar.Poll(ctx, time.Duration(cfg.Solar.IntervalMinutes)*time.Minute, func(r solar.Report) {
 			hub.SetState("solar", r)
@@ -107,16 +68,31 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/config", func(w http.ResponseWriter, r *http.Request) {
-		out := map[string]any{"callsign": cfg.Callsign, "grid": cfg.Grid, "mapStyle": cfg.MapStyle, "demo": cfg.Demo.Enabled, "nearKm": cfg.NearKm}
-		if la, lo, ok := geo.GridToLatLon(cfg.Grid); ok {
+		c := st.config()
+		out := map[string]any{"callsign": c.Callsign, "grid": c.Grid, "mapStyle": c.MapStyle,
+			"demo": c.Demo.Enabled, "nearKm": c.NearKm, "configured": c.configured()}
+		if la, lo, ok := geo.GridToLatLon(c.Grid); ok {
 			out["lat"], out["lon"] = la, lo
 		}
 		writeJSON(w, out)
 	})
+	mux.HandleFunc("POST /api/setup", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Callsign, Grid string }
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&req); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		if err := st.setStation(req.Callsign, req.Grid); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			writeJSON(w, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, map[string]bool{"ok": true})
+	})
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		st := hub.Stats()
-		st["cty"] = cty.Loaded()
-		writeJSON(w, st)
+		h := hub.Stats()
+		h["cty"] = cty.Loaded()
+		writeJSON(w, h)
 	})
 	mux.HandleFunc("GET /api/stream", func(w http.ResponseWriter, r *http.Request) { serveSSE(w, r, hub) })
 	mux.Handle("/", http.FileServer(http.Dir(cfg.WebDir)))
@@ -128,7 +104,7 @@ func main() {
 		defer cancel()
 		srv.Shutdown(sh)
 	}()
-	log.Printf("qthclock listening on http://localhost%s", cfg.Listen)
+	printURLs(cfg.Listen, st.config().configured())
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}

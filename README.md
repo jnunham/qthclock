@@ -13,17 +13,39 @@ A shack display built around **your station**. It combines HamClock's at-a-glanc
 
 Spots from everyone else in the world are filtered out on the server, so the screen stays calm and the feeds stay light.
 
-## Quick start
+## Install and run
 
-You need **Go 1.22+** and **TypeScript** (`npm i -g typescript`). Nothing else gets installed.
+QTHClock needs **only Go 1.22 or newer** to build and run. The web front end is already compiled (`web/dist`), so you don't need Node or TypeScript unless you change the front-end code.
+
+### Raspberry Pi / Debian / Ubuntu
 
 ```sh
-cp config.example.json config.json   # set "callsign" and "grid"
-make demo                            # fake traffic around your call; works offline
-make run                             # live
+git clone https://github.com/jnunham/qthclock.git
+cd qthclock
+./scripts/install-prereqs.sh   # installs Go from go.dev (Debian's golang package is too old)
+source ~/.profile              # once, so this terminal can find Go
+make run
 ```
 
-Open http://localhost:8073. Press **s**, or click the gear, for layout, text size, theme and filters. Kiosk example: `http://pi:8073/?preset=wall&scale=1.6&theme=night`.
+On first launch QTHClock asks for your **callsign** and **grid square**: in the terminal if you started it there, otherwise on the web page. It saves them to `config.json`. To change them later, use **Settings › Change callsign / grid**, or edit `config.json`.
+
+Then open **http://localhost:8073** on the Pi, or **http://&lt;pi-address&gt;:8073** from any computer on your network. The terminal prints both addresses.
+
+### Other systems
+
+Install Go 1.22+ from https://go.dev/dl/, then run `make run` (or, without make: `cd server && go build -o ../qthclock . && cd .. && ./qthclock`).
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `make run` | Build and start with live feeds |
+| `make demo` | Fake traffic around your call; works with no internet |
+| `make test` | Run the tests |
+| `./scripts/install-prereqs.sh --dev` | Also installs Node + TypeScript, for editing `web/src` |
+| `make watch` | Recompile the front end on save (needs `--dev` prereqs) |
+
+Press **s**, or click the gear, for layout, text size, theme and filters. Kiosk example: `http://pi:8073/?preset=wall&scale=1.6&theme=night`.
 
 ### WSJT-X / JTDX
 
@@ -33,7 +55,7 @@ In WSJT-X, open **Settings › Reporting** and set **UDP Server** to `127.0.0.1`
 
 | Key | Meaning |
 |---|---|
-| `callsign`, `grid` | Your station. Needed for "who hears me", distances and "near me". |
+| `callsign`, `grid` | Your station (asked for on first launch). Needed for "who hears me", distances and "near me". |
 | `nearKm` | A cluster/RBN spot is "near you" if its spotter is within this distance (default 1500 km). |
 | `pskreporter.topics` | MQTT topics; `{CALL}` becomes your callsign. Defaults: who hears you, and who you hear. |
 | `rbn.addrs` | `telnet.reversebeacon.net:7000` (CW/RTTY), add `:7001` for FT8/FT4 skimmers. |

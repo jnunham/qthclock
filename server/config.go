@@ -87,6 +87,9 @@ func defaultConfig() Config {
 	return c
 }
 
+// configured reports whether the operator has entered their station.
+func (c Config) configured() bool { return c.Callsign != "" && c.Grid != "" }
+
 func loadConfig(path string) (Config, error) {
 	c := defaultConfig()
 	b, err := os.ReadFile(path)

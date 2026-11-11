@@ -13,10 +13,9 @@ export class QSOPanel {
         this.cfg = cfg;
         this.el = document.createElement("section");
         this.el.className = "panel qsos";
-        this.el.innerHTML = `<h2>QSOs <span class="muted src"></span></h2><div class="now"></div><div class="list"></div>`;
+        this.el.innerHTML = `<h2>QSOs</h2><div class="now"></div><div class="list"></div>`;
         this.now = this.el.querySelector(".now");
         this.list = this.el.querySelector(".list");
-        this.el.querySelector(".src").textContent = cfg.wavelog ? "from Wavelog + WSJT-X" : "from WSJT-X";
     }
     update(ctx) {
         const w = ctx.working;

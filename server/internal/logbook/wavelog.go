@@ -171,6 +171,15 @@ func (w *Wavelog) pollV1(ctx context.Context) error {
 	if err := dec.Decode(&resp); err != nil {
 		return notJSON(body)
 	}
+	// "No new QSOs available" just means nothing was logged since the last
+	// check: that's normal, not an error.
+	if strings.Contains(strings.ToLower(resp.Message+" "+resp.Reason), "no new qso") {
+		if !w.primed {
+			log.Printf("wavelog: connected (API v1), no QSOs to fetch yet")
+			w.primed = true
+		}
+		return nil
+	}
 	if resp.Status == "failed" || resp.Reason != "" {
 		return fmt.Errorf("Wavelog says: %s", firstNonEmpty(resp.Reason, resp.Message, resp.Status))
 	}

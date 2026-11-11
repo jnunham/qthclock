@@ -99,3 +99,15 @@ func TestWavelogErrors(t *testing.T) {
 		t.Errorf("missing station id not reported: %v", err)
 	}
 }
+
+func TestWavelogNoNewQSOsIsNotAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"exported_qsos":0,"lastfetchedid":0,"message":"No new QSOs available","adif":""}`))
+	}))
+	defer srv.Close()
+	ok := false
+	w := &Wavelog{URL: srv.URL, Key: "k", StationID: "1", Add: func(...QSO) {}, Status: func(o bool, m string) { ok = o }, lastID: 4886}
+	if err := w.Poll(context.Background()); err != nil || !ok || w.lastID != 4886 {
+		t.Fatalf("no-new-QSOs treated as error: %v ok=%v last=%d", err, ok, w.lastID)
+	}
+}

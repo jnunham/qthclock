@@ -111,7 +111,7 @@ In WSJT-X, open **Settings › Reporting** and set **UDP Server** to the address
 
 - **WSJT-X on the same computer as QTHClock:** `127.0.0.1`.
 - **WSJT-X on your shack PC, QTHClock on a Pi:** the Pi's IP address (the display tells you which one while the radio shows as idle). Make sure `config.json` has `"wsjtx": {"enabled": true, "listen": "0.0.0.0:2237"}`; older configs had `127.0.0.1:2237`, which only accepts data from the Pi itself.
-- **Also using GridTracker, JTAlert or a logger on 2237?** Only one program can own a normal UDP port. Use multicast instead: set WSJT-X's UDP Server to `224.0.0.73` (tick your network interface under "Outgoing interfaces"), point the other programs at the same address, and set `"listen": "224.0.0.73:2237"` here.
+- **Already using GridTracker?** Leave WSJT-X and GridTracker exactly as they are. In GridTracker go to **Settings › General › Forward UDP Messages**, enter the Pi's IP address and port `2237`, and tick it on. GridTracker passes everything WSJT-X sends on to QTHClock. (JTAlert and most loggers have a similar "forward/rebroadcast UDP" option. Multicast, e.g. `224.0.0.73:2237` in every program, also works.)
 
 This gives QTHClock your band, mode and frequency, who you're working, TX/RX state, the QSOs you log and (if enabled) what you decode. When nothing is coming in, the top bar says why (no data yet, port in use, last heard N minutes ago).
 

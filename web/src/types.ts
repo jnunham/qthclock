@@ -37,7 +37,6 @@ export interface ServerConfig {
   grid: string;
   lat?: number;
   lon?: number;
-  mapStyle: string;
   demo: boolean;
   nearKm: number;
   configured: boolean;
@@ -46,21 +45,6 @@ export interface ServerConfig {
   wavelog: boolean;
   boot: number;
   ips?: string[];
-}
-
-/** The station WSJT-X says you're working right now (call is "" between QSOs). */
-export interface Working {
-  call: string;
-  grid?: string;
-  lat?: number;
-  lon?: number;
-  f: number;
-  b: string;
-  m: string;
-  report?: string;
-  txEnabled: boolean;
-  tx: boolean;
-  updated: number;
 }
 
 export interface QSO {
@@ -73,7 +57,9 @@ export interface QSO {
   grid?: string;
   name?: string;
   country?: string;
-  src: "wavelog" | "wsjtx";
+  src: string;
+  lat?: number;
+  lon?: number;
 }
 
 /** The station the operator is looking at (clicked on the map or a list). */
@@ -102,19 +88,18 @@ export interface UpdateContext {
   connected: boolean;
   dx?: DXSelection;
   select(sel: DXSelection | undefined): void;
-  working?: Working; // only while WSJT-X is running
   qsos: QSO[];
   wavelog?: { ok: boolean; error: string; at: number };
-  wsjtx?: WSJTXInfo;
-  /** The band/mode the radio is on, when following the radio. */
+  /** Where you're being spotted right now (from PSK Reporter / RBN). */
+  onAir?: OnAir;
+  /** The band/mode the display is following (onAir, when "follow" is on). */
   active?: { band: string; mode: string };
 }
 
-/** Listener diagnostics, shown when the radio looks idle. */
-export interface WSJTXInfo {
-  listen: string;
-  error?: string;
-  lastFrom?: string;
-  lastAt?: number;
-  packets: number;
+/** The band and mode you're being spotted on, worked out from your spots. */
+export interface OnAir {
+  band: string;
+  mode: string;
+  last: number;    // time of the newest spot on that band/mode
+  count: number;   // spots in the last 10 minutes
 }

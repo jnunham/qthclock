@@ -26,7 +26,7 @@ func (r Relevance) Tag(s spots.Spot) (spots.Spot, bool) {
 			s.Dist = &d
 		}
 		return s, true
-	case s.Source == "wsjtx" || (me != "" && geo.CallOf(s.DE) == me):
+	case me != "" && geo.CallOf(s.DE) == me:
 		s.Rel = "here"
 		if r.HasQTH && s.DXLat != nil {
 			d := geo.DistanceKm(r.Lat, r.Lon, *s.DXLat, *s.DXLon)

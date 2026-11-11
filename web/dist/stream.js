@@ -16,10 +16,8 @@ export function connectStream(h) {
     es.addEventListener("snapshot", parse(h.snapshot));
     es.addEventListener("spots", parse(h.spots));
     es.addEventListener("solar", parse(h.solar));
-    es.addEventListener("working", parse(h.working));
     es.addEventListener("qsos", parse(h.qsos));
     es.addEventListener("settings", parse(h.settings));
-    es.addEventListener("wsjtx", parse(h.wsjtx));
     es.addEventListener("wavelog", parse(h.wavelog));
     es.onopen = () => h.status(true);
     es.onerror = () => h.status(false);

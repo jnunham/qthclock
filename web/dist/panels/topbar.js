@@ -9,11 +9,9 @@ export class TopBar {
     solar;
     status;
     radio;
-    ips;
     constructor(el, cfg, settings) {
         this.settings = settings;
         this.el = el;
-        this.ips = cfg.ips ?? [];
         el.innerHTML = `
       <div class="ident">
         <div class="call">${cfg.callsign || "NOCALL"}</div>
@@ -41,14 +39,21 @@ export class TopBar {
         this.local.textContent =
             d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }) +
                 " · local " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-        const r = ctx.working;
-        this.radio.innerHTML = r
-            ? `<span class="band" style="--c:${bandColor(r.b)}">${r.b || "—"}</span>
-         <span class="rmode">${r.m}</span>
-         <span class="rfreq muted">${(r.f / 1000).toFixed(3)} MHz</span>
-         <span class="txrx ${r.tx ? "tx" : ""}">${r.tx ? "TX" : "RX"}</span>`
-            : `<span class="idle"><span class="muted">Radio idle</span><span class="why">${idleReason(ctx, this.ips)}</span></span>`;
-        this.radio.title = r ? "Band and mode from WSJT-X" : "";
+        // What you're being heard on, worked out from your PSK Reporter / RBN spots.
+        const o = ctx.onAir;
+        if (o) {
+            const mins = Math.floor((ctx.now - o.last) / 60000);
+            this.radio.innerHTML = `
+        <span class="onair-label">ON AIR</span>
+        <span class="band" style="--c:${bandColor(o.band)}">${o.band}</span>
+        <span class="rmode">${o.mode}</span>
+        <span class="rfreq muted">${mins < 1 ? "spotted just now" : `last spot ${mins} min ago`}</span>`;
+            this.radio.title = `${o.count} spots of you on ${o.band} ${o.mode} in the last 10 minutes`;
+        }
+        else {
+            this.radio.innerHTML = `<span class="muted">Not spotted in the last 10 min</span>`;
+            this.radio.title = "The band and mode here come from PSK Reporter / RBN stations hearing you";
+        }
         this.solar.hidden = !s.show.solar;
         this.solar.innerHTML = renderSolar(ctx.solar);
         this.status.innerHTML = `
@@ -76,20 +81,5 @@ function count(ctx, rel) {
         if (s.rel === rel)
             calls.add(rel === "me" ? s.de : s.dx);
     return calls.size;
-}
-/** Explain why no radio is showing, so a wrong WSJT-X setting is obvious on the wall. */
-function idleReason(ctx, ips) {
-    const i = ctx.wsjtx;
-    const port = i?.listen.split(":").pop() || "2237";
-    const target = `${ips[0] ?? "this computer's IP"} port ${port}`;
-    if (!i)
-        return "";
-    if (i.error)
-        return `WSJT-X listener: ${i.error}`;
-    if (!i.packets)
-        return `No WSJT-X data yet. In WSJT-X › Settings › Reporting set UDP Server to ${target}`;
-    if (i.lastAt && ctx.now - i.lastAt > 60_000)
-        return `WSJT-X last heard ${Math.round((ctx.now - i.lastAt) / 60000)} min ago`;
-    return "WSJT-X connected, waiting for its status";
 }
 //# sourceMappingURL=topbar.js.map

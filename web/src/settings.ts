@@ -11,7 +11,6 @@ export interface Settings {
     solar: boolean;
     dedx: boolean;
     mySignal: boolean;
-    heardHere: boolean;
     dxSpots: boolean;
     log: boolean;
     arcs: boolean;
@@ -19,11 +18,10 @@ export interface Settings {
   };
   scale: number;          // text/UI scale multiplier
   theme: Theme;
-  globe: boolean;
   maxAgeMin: number;      // hide spots older than this
   sources: Record<string, boolean>;
   dx: DXFilter;           // filters for "DX near you"
-  followRadio: boolean;   // follow WSJT-X's band and mode automatically
+  followRadio: boolean;   // follow the band/mode you're being spotted on
   map: MapView;
 }
 
@@ -48,12 +46,11 @@ export const PRESETS: Record<Preset, { label: string; side: "right" | "bottom" |
 
 export const DEFAULTS: Settings = {
   preset: "balanced",
-  show: { clock: true, solar: true, dedx: true, mySignal: true, heardHere: false, dxSpots: true, log: true, arcs: true, grayline: true },
+  show: { clock: true, solar: true, dedx: true, mySignal: true, dxSpots: true, log: true, arcs: true, grayline: true },
   scale: 1,
   theme: "dark",
-  globe: false,
   maxAgeMin: 15,
-  sources: { pskr: true, wsjtx: true, rbn: true, cluster: true, demo: true },
+  sources: { pskr: true, rbn: true, cluster: true, demo: true },
   dx: { bands: [], modes: [], hideCountry: true, hideCont: false },
   followRadio: true,
   map: { zoom: 0, center: "home" },
@@ -66,7 +63,7 @@ export function mergeSettings(saved: Partial<Settings> | null | undefined): Sett
   return {
     ...d, ...saved,
     show: { ...d.show, ...saved.show },
-    sources: { ...d.sources, ...saved.sources },
+    sources: Object.fromEntries(Object.keys(d.sources).map((k) => [k, saved.sources?.[k] ?? d.sources[k]])),
     dx: { ...d.dx, ...saved.dx },
     map: { ...d.map, ...saved.map },
   };

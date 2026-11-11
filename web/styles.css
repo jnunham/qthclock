@@ -16,21 +16,23 @@
   --fair: #fcc419;
   --poor: #ff6b6b;
   --map-sea: #0b1622;
+  --map-land: #1c2b3b;
+  --map-border: rgba(160, 190, 220, 0.22);
   color-scheme: dark;
 }
 :root[data-theme="light"] {
   --bg: #e9edf2; --panel: #ffffff; --panel-2: #f3f6f9; --line: #d5dde6;
-  --text: #17202b; --muted: #5d6b7c; --accent: #1c7ed6; --map-sea: #dbe7f3;
+  --text: #17202b; --muted: #5d6b7c; --accent: #1c7ed6; --map-sea: #cfe0f0; --map-land: #f4f1ea; --map-border: rgba(60, 80, 100, 0.35);
   --good: #2b8a3e; --fair: #b08800; --poor: #c92a2a;
   color-scheme: light;
 }
 /* Night mode: everything red to keep your dark adaptation. */
 :root[data-theme="night"] {
   --bg: #000; --panel: #0d0000; --panel-2: #160000; --line: #3a0a0a;
-  --text: #ff4d4d; --muted: #a33; --accent: #ff4d4d; --map-sea: #0a0000;
+  --text: #ff4d4d; --muted: #a33; --accent: #ff4d4d; --map-sea: #0a0000; --map-land: #1a0303; --map-border: rgba(255, 77, 77, 0.25);
   --good: #ff4d4d; --fair: #ff4d4d; --poor: #ff4d4d;
 }
-:root[data-theme="night"] #map { filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(4) brightness(0.6); }
+:root[data-theme="night"] #map canvas { filter: saturate(0.2) sepia(1) hue-rotate(-50deg) saturate(3) brightness(0.8); }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
@@ -139,9 +141,8 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; ov
   background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 0.25rem 0.6rem; border-radius: 0.4rem; border: 1px solid var(--line); }
 #legend span { display: flex; align-items: center; gap: 0.35rem; }
 #legend i { width: 0.6rem; height: 0.6rem; border-radius: 50%; display: inline-block; }
-#legend .ln-me, #legend .ln-here, #legend .ln-sel { width: 1.4rem; height: 0; border-radius: 0; border-top: 2px solid #a9e34b; }
-#legend .ln-here { border-top-style: dashed; }
-#legend .ln-sel { border-top: 3px solid var(--text); }
+#legend .ln-me { width: 1.4rem; height: 0; border-radius: 0; border-top: 2px solid #a9e34b; }
+#legend .dot-dx { border: 2px solid var(--text); width: 0.55rem; height: 0.55rem; }
 #legend .dot-near { border: 2px solid #ffa94d; width: 0.55rem; height: 0.55rem; }
 
 /* ---------- settings ---------- */
@@ -176,8 +177,6 @@ body.idle, body.idle * { cursor: none; }
 #drawer .chip.on { opacity: 1; outline: 2px solid var(--c, var(--accent)); }
 
 /* MapLibre popups follow the theme */
-.maplibregl-popup-content { background: var(--panel); color: var(--text); font-size: 0.9rem; border: 1px solid var(--line); }
-.maplibregl-popup-tip { display: none; }
 
 /* ---------- first-run setup ---------- */
 #setup { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
@@ -260,3 +259,4 @@ body.idle, body.idle * { cursor: none; }
   background: color-mix(in srgb, var(--panel) 85%, transparent); color: var(--text); border: 1px solid var(--line); }
 #mapctl button:hover { border-color: var(--accent); }
 body.idle #mapctl { opacity: 0; pointer-events: none; }
+.radio .onair-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; color: var(--good); }

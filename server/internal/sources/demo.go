@@ -21,7 +21,6 @@ type Demo struct {
 	Pub  func(spots.Spot)
 	Rate int // spots per second
 
-	OnStatus func(logbook.Working)
 	OnLogged func(logbook.QSO)
 
 	mu   sync.Mutex
@@ -66,6 +65,9 @@ func (d *Demo) Run(ctx context.Context) {
 	for _, b := range demoBands {
 		total += b.weight
 	}
+	d.mu.Lock()
+	d.band = "20m"
+	d.mu.Unlock()
 	go d.qsoLoop(ctx)
 	tick := time.NewTicker(time.Second / time.Duration(d.Rate))
 	defer tick.Stop()
@@ -87,7 +89,7 @@ func (d *Demo) Run(ctx context.Context) {
 		other := demoStations[rand.Intn(len(demoStations))]
 		s := spots.Spot{FreqKHz: b.f + rand.Float64()*2.5, Band: b.band, Mode: b.mode, SNR: spots.I(rand.Intn(40) - 22)}
 		switch k := rand.Intn(10); {
-		case k < 4: // someone hears me, mostly on the band the radio is on
+		case k < 6: // someone hears me, mostly on the band I'm on
 			s.Source, s.DX, s.DXGrid, s.DE, s.DEGrid = "pskr", d.Call, d.Grid, other.call, other.grid
 			d.mu.Lock()
 			cur := d.band
@@ -100,9 +102,6 @@ func (d *Demo) Run(ctx context.Context) {
 			if b.mode == "CW" {
 				s.Source = "rbn"
 			}
-		case k < 7: // I hear someone (my WSJT-X)
-			s.Source, s.DX, s.DXGrid, s.DE, s.DEGrid = "wsjtx", other.call, other.grid, d.Call, d.Grid
-			s.Mode = "FT8"
 		default: // DX spotted near me
 			sk := demoSkimmers[rand.Intn(len(demoSkimmers))]
 			s.Source, s.DX, s.DXGrid, s.DE, s.DEGrid = "rbn", other.call, "", sk.call, sk.grid
@@ -131,52 +130,33 @@ func (d *Demo) Run(ctx context.Context) {
 	}
 }
 
-// qsoLoop pretends to work a station every ~40 s: call, alternate TX/RX in
-// 15 s FT8 periods, log it, repeat. Seeds a few past QSOs first.
+// qsoLoop pretends to work a station every ~40 s and log it, changing band
+// every few QSOs so the display's "on air" band can be seen to follow.
+// Seeds a few past QSOs first.
 func (d *Demo) qsoLoop(ctx context.Context) {
-	if d.OnStatus == nil || d.OnLogged == nil {
+	if d.OnLogged == nil {
 		return
 	}
 	now := time.Now()
 	for i := 5; i >= 1; i-- {
 		o := demoStations[rand.Intn(len(demoStations))]
 		d.OnLogged(logbook.QSO{Call: o.call, Grid: o.grid, Country: o.country, Time: now.Add(-time.Duration(i*4) * time.Minute).UnixMilli(),
-			Band: "20m", Mode: "FT8", RSTSent: snrStr(), RSTRcvd: snrStr(), Source: "wsjtx"})
+			Band: "20m", Mode: "FT8", RSTSent: snrStr(), RSTRcvd: snrStr(), Source: "wavelog"})
 	}
-	// The demo radio changes band every few QSOs, so the display's
-	// follow-the-radio behaviour can be seen.
-	dials := []struct {
-		band string
-		f    float64
-	}{{"20m", 14074}, {"40m", 7074}, {"15m", 21074}, {"17m", 18100}}
+	bands := []string{"20m", "40m", "15m", "17m"}
 	for n := 0; ; n++ {
-		dial := dials[(n/3)%len(dials)]
+		band := bands[(n/3)%len(bands)]
 		d.mu.Lock()
-		d.band = dial.band
+		d.band = band
 		d.mu.Unlock()
-		o := demoStations[rand.Intn(len(demoStations))]
-		start := time.Now()
-		for p := 0; p < 4; p++ {
-			w := logbook.Working{Call: o.call, Grid: o.grid, FreqKHz: dial.f, Band: dial.band, Mode: "FT8", Report: snrStr(), TxEnabled: true,
-				Transmitting: p%2 == 0, Updated: time.Now().UnixMilli()}
-			if la, lo, ok := geo.GridToLatLon(o.grid); ok {
-				w.Lat, w.Lon = spots.F(la), spots.F(lo)
-			}
-			d.OnStatus(w)
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(10 * time.Second):
-			}
-		}
-		d.OnLogged(logbook.QSO{Call: o.call, Grid: o.grid, Country: o.country, Time: start.UnixMilli(), Band: dial.band, Mode: "FT8",
-			RSTSent: snrStr(), RSTRcvd: snrStr(), Source: "wsjtx"})
-		d.OnStatus(logbook.Working{FreqKHz: dial.f, Band: dial.band, Mode: "FT8", Updated: time.Now().UnixMilli()})
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(5 * time.Second):
+		case <-time.After(40 * time.Second):
 		}
+		o := demoStations[rand.Intn(len(demoStations))]
+		d.OnLogged(logbook.QSO{Call: o.call, Grid: o.grid, Country: o.country, Time: time.Now().UnixMilli(), Band: band, Mode: "FT8",
+			RSTSent: snrStr(), RSTRcvd: snrStr(), Source: "wavelog"})
 	}
 }
 

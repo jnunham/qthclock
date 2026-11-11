@@ -13,8 +13,9 @@ type Config struct {
 	WebDir   string `json:"webDir"`
 	DataDir  string `json:"dataDir"`
 
-	// MapStyle is a MapLibre style URL. The default is a free dark basemap.
-	MapStyle string `json:"mapStyle"`
+	// WorldURL is where the map's coastlines and borders (Natural Earth,
+	// public domain) are downloaded from on first start.
+	WorldURL string `json:"worldUrl"`
 
 	HistoryMinutes int `json:"historyMinutes"`
 	HistoryMax     int `json:"historyMax"`
@@ -34,12 +35,6 @@ type Config struct {
 		Enabled bool   `json:"enabled"`
 		Addr    string `json:"addr"`
 	} `json:"cluster"`
-
-	// WSJTX receives decodes from WSJT-X/JTDX on your PC: your own receiver as a spot source.
-	WSJTX struct {
-		Enabled bool   `json:"enabled"`
-		Listen  string `json:"listen"`
-	} `json:"wsjtx"`
 
 	// Wavelog shows your latest QSOs. APIKey: a Wavelog 3.1+ token ("wl2_...")
 	// or a classic read-only API key (then StationID is required too).
@@ -76,20 +71,17 @@ func defaultConfig() Config {
 	c.Listen = ":8073"
 	c.WebDir = "web"
 	c.DataDir = "data"
-	c.MapStyle = "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json"
+	c.WorldURL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"
 	c.HistoryMinutes = 30
 	c.HistoryMax = 20000
 	c.PSKReporter.Enabled = true
 	c.PSKReporter.Addr = "mqtt.pskreporter.info:1883"
 	c.PSKReporter.Topics = []string{
-		"pskr/filter/v2/+/+/{CALL}/#",   // who hears me
-		"pskr/filter/v2/+/+/+/{CALL}/#", // who I hear (as reported by my own software)
+		"pskr/filter/v2/+/+/{CALL}/#", // who hears me
 	}
 	c.RBN.Enabled = true
 	c.RBN.Addrs = []string{"telnet.reversebeacon.net:7000", "telnet.reversebeacon.net:7001"} // CW/RTTY, FT8/FT4
 	c.Cluster.Addr = "dxc.nc7j.com:7373"
-	c.WSJTX.Enabled = true
-	c.WSJTX.Listen = "0.0.0.0:2237" // any interface, so WSJT-X on another PC can reach a Pi
 	c.NearKm = 1500
 	c.Wavelog.IntervalSeconds = 60
 	c.Solar.Enabled = true

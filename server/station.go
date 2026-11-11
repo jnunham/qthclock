@@ -91,7 +91,6 @@ func (s *station) start() {
 	s.cancel = cancel
 	cfg := s.cfg
 	hub, loc, recent := s.hub, s.loc, s.recent
-	working := func(w logbook.Working) { hub.SetState("working", w) }
 
 	// Everything goes through the relevance filter: only spots about me, heard
 	// by me, or spotted near me reach the display.
@@ -116,7 +115,7 @@ func (s *station) start() {
 	if cfg.Demo.Enabled {
 		log.Printf("demo mode: generating %d fake spots/s around %s", cfg.Demo.Rate, rel.Call)
 		go (&sources.Demo{Call: rel.Call, Grid: cfg.Grid, Pub: pub, Rate: cfg.Demo.Rate,
-			OnStatus: working, OnLogged: func(q logbook.QSO) { recent.Add(q) }}).Run(ctx)
+			OnLogged: func(q logbook.QSO) { recent.Add(q) }}).Run(ctx)
 		return
 	}
 	if !cfg.configured() {
@@ -126,11 +125,6 @@ func (s *station) start() {
 	if cfg.PSKReporter.Enabled {
 		go (&sources.PSKReporter{Addr: cfg.PSKReporter.Addr, Topics: cfg.PSKReporter.Topics,
 			Call: cfg.Callsign, Pub: pub, Locator: loc}).Run(ctx)
-	}
-	if cfg.WSJTX.Enabled {
-		go (&sources.WSJTX{Listen: cfg.WSJTX.Listen, Call: cfg.Callsign, Grid: cfg.Grid, Pub: pub, Locator: loc,
-			OnStatus: working, OnLogged: func(q logbook.QSO) { recent.Add(q) },
-			OnListen: func(i sources.WSJTXInfo) { hub.SetState("wsjtx", i) }}).Run(ctx)
 	}
 	if cfg.RBN.Enabled {
 		for _, a := range cfg.RBN.Addrs {

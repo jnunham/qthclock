@@ -24,9 +24,8 @@ export function initDrawer(cfg, get, editStation, set) {
         ${checkbox("clock", "Clock")}${checkbox("solar", "Solar")}
         ${checkbox("dedx", "DE / DX")}${checkbox("mySignal", "My signal")}
         ${checkbox("dxSpots", "DX near me")}${checkbox("log", "QSOs")}
-        ${checkbox("heardHere", "Heard here (what I decode)")}${checkbox("arcs", "Path lines")}
+        ${checkbox("arcs", "Lines to stations hearing me")}
         ${checkbox("grayline", "Gray line")}
-        <label class="check"><input type="checkbox" data-globe ${s.globe ? "checked" : ""}> Globe view</label>
       </div>
 
       <h3>Map zoom <span class="muted">${s.map.zoom === 0 ? "whole world" : `+${s.map.zoom}`}</span></h3>
@@ -49,10 +48,10 @@ export function initDrawer(cfg, get, editStation, set) {
       <h3>Keep spots for</h3>
       <select data-age>${[5, 10, 15, 30, 60].map((m) => `<option value="${m}" ${s.maxAgeMin === m ? "selected" : ""}>${m} minutes</option>`).join("")}</select>
 
-      <h3>Radio</h3>
-      <label class="check"><input type="checkbox" data-follow ${s.followRadio ? "checked" : ""}> Follow WSJT-X: show DX on my current band and mode, fade other bands on the map</label>
+      <h3>On air</h3>
+      <label class="check"><input type="checkbox" data-follow ${s.followRadio ? "checked" : ""}> Follow my spots: show DX on the band and mode I'm being heard on, fade other bands on the map</label>
 
-      <h3 id="dx-filters">DX near me <span class="muted">${s.followRadio ? "(used when the radio is idle)" : ""}</span></h3>
+      <h3 id="dx-filters">DX near me <span class="muted">${s.followRadio ? "(used when you haven't been spotted recently)" : ""}</span></h3>
       <div class="chips">${Object.keys(MODE_GROUPS).map((m) => `<button data-mode="${m}" class="chip ${s.dx.modes.includes(m) ? "on" : ""}">${m}</button>`).join("")}</div>
       <div class="chips">${BANDS.map((b) => `<button data-band="${b}" class="chip ${s.dx.bands.includes(b) ? "on" : ""}" style="--c:${bandColor(b)}">${b}</button>`).join("")}</div>
       <p class="muted small">Pick the modes and bands you're working. Nothing selected means all of them.</p>
@@ -104,8 +103,6 @@ export function initDrawer(cfg, get, editStation, set) {
             s.show[t.dataset.show] = t.checked;
         else if (t.dataset.dx)
             s.dx[t.dataset.dx] = t.checked;
-        else if ("globe" in t.dataset)
-            s.globe = t.checked;
         else if ("follow" in t.dataset) {
             s.followRadio = t.checked;
             set(s);
@@ -158,6 +155,6 @@ function contName(c) {
     return { NA: "North America", SA: "South America", EU: "Europe", AF: "Africa", AS: "Asia", OC: "Oceania", AN: "Antarctica" }[c] ?? c;
 }
 function srcName(k) {
-    return { pskr: "PSK Reporter", wsjtx: "WSJT-X", rbn: "RBN", cluster: "DX cluster", demo: "Demo" }[k] ?? k;
+    return { pskr: "PSK Reporter", rbn: "RBN", cluster: "DX cluster", demo: "Demo" }[k] ?? k;
 }
 //# sourceMappingURL=drawer.js.map

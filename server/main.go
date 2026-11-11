@@ -63,6 +63,27 @@ func main() {
 	}()
 
 	recent := logbook.NewRecent(10, func(q []logbook.QSO) { hub.SetState("qsos", q) })
+	recent.Locate = func(q *logbook.QSO) {
+		if la, lo, ok := geo.GridToLatLon(q.Grid); ok {
+			q.Lat, q.Lon = spots.F(la), spots.F(lo)
+		} else if _, la, lo, ok := cty.Lookup(q.Call); ok {
+			q.Lat, q.Lon = spots.F(la), spots.F(lo)
+		}
+	}
+
+	// World outline for the map (Natural Earth via world-atlas, public domain).
+	// Downloaded once to data/world.json; the map shows a plain grid until then.
+	worldPath := filepath.Join(cfg.DataDir, "world.json")
+	go func() {
+		if _, err := os.Stat(worldPath); err == nil || cfg.WorldURL == "" {
+			return
+		}
+		if err := geo.Download(worldPath, cfg.WorldURL); err != nil {
+			log.Printf("map: couldn't download world outline (%v); showing a grid map", err)
+		} else {
+			log.Printf("map: downloaded world outline")
+		}
+	}()
 	st := &station{cfg: cfg, path: *cfgPath, fileDemo: fileDemo, hub: hub, recent: recent, loc: sources.Locator{CTY: cty}, parent: ctx}
 	st.start()
 
@@ -76,11 +97,15 @@ func main() {
 	boot := time.Now().UnixMilli() // lets open screens notice a restart and reload new code
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/world", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "max-age=86400")
+		http.ServeFile(w, r, worldPath)
+	})
 	mux.HandleFunc("GET /api/settings", display.get)
 	mux.HandleFunc("PUT /api/settings", display.put)
 	mux.HandleFunc("GET /api/config", func(w http.ResponseWriter, r *http.Request) {
 		c := st.config()
-		out := map[string]any{"callsign": c.Callsign, "grid": c.Grid, "mapStyle": c.MapStyle,
+		out := map[string]any{"callsign": c.Callsign, "grid": c.Grid,
 			"demo": c.Demo.Enabled, "nearKm": c.NearKm, "configured": c.configured(), "boot": boot, "ips": lanIPs()}
 		if la, lo, ok := geo.GridToLatLon(c.Grid); ok {
 			out["lat"], out["lon"] = la, lo

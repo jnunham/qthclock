@@ -27,7 +27,7 @@ export class DeDx implements Panel {
       ? `<div class="kv"><span>${cfg.grid}</span><span class="muted">${sunLine(de.lat, de.lon)}</span></div>`
       : `<div class="muted">Set "grid" in config.json</div>`;
 
-    let dxHtml = `<div class="muted hint">Shows the station you're working in WSJT-X</div>`;
+    let dxHtml = `<div class="muted hint">Shows your last QSO from Wavelog, or a station you click</div>`;
     const dx = ctx.dx;
     if (dx) {
       const loc = approxLocal(ctx.now, dx.lon);
@@ -56,8 +56,7 @@ export class DeDx implements Panel {
         ${deHtml}
       </div>
       <div class="col">
-        <h2>DX ${dx?.reason === "working" ? '<span class="workbadge">working now</span>'
-          : dx?.reason === "last" ? '<span class="autobadge">last QSO</span>' : ""} ${dx?.reason === "manual" ? '<button class="clear" title="Clear">✕</button>' : ""}</h2>
+        <h2>DX ${dx?.reason === "last" ? '<span class="autobadge">last QSO</span>' : ""} ${dx?.reason === "manual" ? '<button class="clear" title="Clear">✕</button>' : ""}</h2>
         <div class="big">${dx ? dx.call : "—"}</div>
         ${dxHtml}
       </div>`;
@@ -66,5 +65,5 @@ export class DeDx implements Panel {
 }
 
 function relText(rel: string): string {
-  return rel === "me" ? "heard you" : rel === "here" ? "you heard them" : "spotted near you";
+  return rel === "me" ? "heard you" : "spotted near you";
 }

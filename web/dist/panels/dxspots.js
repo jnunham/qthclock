@@ -41,7 +41,7 @@ export class DXSpots {
         const f = this.settings().dx;
         const parts = [
             ...(ctx.active
-                ? [`following radio: ${ctx.active.band} ${ctx.active.mode}`]
+                ? [`following you: ${ctx.active.band} ${ctx.active.mode}`]
                 : [f.modes.length ? f.modes.join(" ") : "all modes", f.bands.length ? f.bands.join(" ") : "all bands"]),
             f.hideCont ? `no ${this.cfg.cont ?? "home continent"}` : f.hideCountry ? `no ${this.cfg.country ?? "home country"}` : "",
             `≤${Math.round(this.cfg.nearKm).toLocaleString()} km`,

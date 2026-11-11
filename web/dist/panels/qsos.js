@@ -1,50 +1,27 @@
 import { bandColor } from "../bands.js";
 import { hhmm } from "../astro.js";
-/**
- * "Now working" (live from WSJT-X) above your most recent QSOs (from Wavelog
- * and/or WSJT-X's "QSO logged" messages).
- */
+/** Your most recent QSOs, from Wavelog. */
 export class QSOPanel {
     cfg;
     el;
-    now;
     list;
     constructor(cfg) {
         this.cfg = cfg;
         this.el = document.createElement("section");
         this.el.className = "panel qsos";
-        this.el.innerHTML = `<h2>QSOs</h2><div class="now"></div><div class="list"></div>`;
-        this.now = this.el.querySelector(".now");
+        this.el.innerHTML = `<h2>QSOs</h2><div class="list"></div>`;
         this.list = this.el.querySelector(".list");
     }
     update(ctx) {
-        const w = ctx.working;
-        if (w && w.call) {
-            this.now.innerHTML = `
-        <div class="working ${w.tx ? "tx" : ""}">
-          <span class="badge">${w.tx ? "TX" : "RX"}</span>
-          <span class="call">${w.call}</span>
-          <span class="muted">${w.grid ?? ""}</span>
-          <span class="spacer"></span>
-          <span>${(w.f / 1000).toFixed(3)} MHz ${w.m}</span>
-          ${w.report ? `<span class="muted">sent ${w.report}</span>` : ""}
-        </div>`;
-        }
-        else if (w) {
-            this.now.innerHTML = `<div class="working idle"><span class="badge">RX</span><span class="muted">Not in a QSO · ${(w.f / 1000).toFixed(3)} MHz ${w.m}</span></div>`;
-        }
-        else {
-            this.now.innerHTML = "";
-        }
         const wl = ctx.wavelog;
         const wlError = wl && !wl.ok && wl.error ? `<div class="wlerror" title="Run ./qthclock -check-wavelog on the Pi for details">Wavelog: ${esc(wl.error)}</div>` : "";
         if (!ctx.qsos.length) {
             this.list.innerHTML = wlError + `<div class="muted hint">${this.cfg.wavelog
                 ? wl?.ok ? "No QSOs in Wavelog yet." : wlError ? "" : "Connecting to Wavelog…"
-                : "QSOs you log in WSJT-X show here. Add your Wavelog URL and API key in config.json to show your logbook."}</div>`;
+                : "Add your Wavelog URL and API key in config.json to show your latest QSOs here."}</div>`;
             return;
         }
-        this.list.innerHTML = `<table><tbody>${ctx.qsos.slice(0, 5).map((q) => `
+        this.list.innerHTML = `<table><tbody>${ctx.qsos.slice(0, 6).map((q) => `
       <tr title="${[q.name, q.country, q.grid, `via ${q.src}`].filter(Boolean).join(" · ")}">
         <td class="muted">${hhmm(new Date(q.t))}</td>
         <td class="call">${q.call}</td>

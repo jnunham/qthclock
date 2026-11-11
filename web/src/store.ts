@@ -49,7 +49,7 @@ export class SpotStore {
       const sp = this.spots[i];
       if (sp.t < cut) continue;
       if (s.sources[sp.src] === false) continue;
-      if (sp.rel === "here" && !s.show.heardHere) continue;
+      if (sp.rel === "here") continue; // only who hears me, and DX near me
       if (sp.rel === "near" && !passesDX(sp, s, cfg, active)) continue;
       out.push(sp);
     }

@@ -3,15 +3,43 @@ import { SpotStore } from "./store.js";
 import { connectStream } from "./stream.js";
 import { initDrawer } from "./drawer.js";
 import { TopBar } from "./panels/topbar.js";
-import { createMap } from "./panels/map.js";
+import { WorldMap, MAX_ZOOM_STEPS } from "./panels/map.js";
 import { DeDx } from "./panels/dedx.js";
 import { BandSummary } from "./panels/bandsummary.js";
 import { DXSpots } from "./panels/dxspots.js";
 import { showSetup } from "./setup.js";
 import { QSOPanel } from "./panels/qsos.js";
-import { MAX_ZOOM_STEPS } from "./panels/map.js";
-/** A station you click stays the DX this long, then the display goes back to your QSO partner. */
+import { modeGroup } from "./bands.js";
+/** A station you click stays the DX this long, then the display goes back to your last QSO. */
 const MANUAL_HOLD_MS = 3 * 60_000;
+/** Your last Wavelog QSO is shown as the DX for this long. */
+const LAST_QSO_MS = 2 * 60 * 60_000;
+/** "On air" looks at spots of you from the last 10 minutes. */
+const ON_AIR_MS = 10 * 60_000;
+/**
+ * Work out the band and mode you're on from who's hearing you, like HamSpotter
+ * or HamAlert: the band/mode with the most spots of you, counting the last
+ * 5 minutes fully and the 5 before that at a third.
+ */
+function onAirFrom(spots, now) {
+    const score = new Map();
+    for (const s of spots) {
+        if (s.rel !== "me" || !s.b || now - s.t > ON_AIR_MS)
+            continue;
+        const mode = modeGroup(s.m);
+        const key = s.b + "|" + mode;
+        const e = score.get(key) ?? { band: s.b, mode, w: 0, last: 0, count: 0 };
+        e.w += now - s.t < ON_AIR_MS / 2 ? 1 : 1 / 3;
+        e.last = Math.max(e.last, s.t);
+        e.count++;
+        score.set(key, e);
+    }
+    let best;
+    for (const e of score.values())
+        if (!best || e.w > best.w)
+            best = e;
+    return best && { band: best.band, mode: best.mode, last: best.last, count: best.count };
+}
 async function main() {
     const cfg = await fetch("api/config").then((r) => r.json());
     if (!cfg.configured && !cfg.demo) {
@@ -26,25 +54,19 @@ async function main() {
     const store = new SpotStore();
     let solar;
     let connected = false;
-    let working;
     let qsos = [];
     let wavelog;
-    let wsjtx;
-    // DX selection: the station you're working > a recent click > your last QSO partner.
     let manual;
-    let workingSel;
-    let lastSel;
     const topbar = new TopBar(document.getElementById("topbar"), cfg, get);
-    const map = createMap(document.getElementById("map"), cfg, get);
+    const map = new WorldMap(document.getElementById("map"), cfg, get);
     const dedx = new DeDx(cfg);
     const mySignal = new BandSummary("me", "My signal · who hears me", cfg.callsign ? "Nobody has reported you yet. Call CQ on FT8, or check RBN for CW." : 'Set "callsign" in config.json.');
-    const heardHere = new BandSummary("here", "Heard here · what I'm decoding", "Nothing decoded yet. In WSJT-X: Settings › Reporting › UDP Server 127.0.0.1:2237.");
     let openDrawer = () => { };
     const dxSpots = new DXSpots(cfg, get, () => openDrawer("dx"));
     const qsoPanel = new QSOPanel(cfg);
     const side = document.getElementById("side");
     const sideItems = [
-        [dedx, "dedx"], [qsoPanel, "log"], [mySignal, "mySignal"], [heardHere, "heardHere"], [dxSpots, "dxSpots"],
+        [dedx, "dedx"], [qsoPanel, "log"], [mySignal, "mySignal"], [dxSpots, "dxSpots"],
     ];
     for (const [p] of sideItems)
         side.append(p.el);
@@ -61,7 +83,6 @@ async function main() {
         body.dataset.side = sideVisible ? p.side : "none";
         body.style.setProperty("--side-size", p.size);
         side.hidden = !sideVisible;
-        document.querySelector("#legend .lg-here").hidden = !settings.show.heardHere;
     };
     applyLayout();
     const applyShared = (s) => {
@@ -84,25 +105,9 @@ async function main() {
         snapshot: (list) => store.replace(list),
         spots: (batch) => store.add(batch),
         solar: (s) => (solar = s),
-        working: (w) => {
-            if (w.call && w.call !== working?.call && w.lat != null && w.lon != null) {
-                workingSel = { call: w.call, lat: w.lat, lon: w.lon, grid: w.grid, reason: "working" };
-                manual = undefined; // a new QSO takes over from whatever was clicked
-            }
-            w.updated = Date.now(); // use this screen's clock, in case the Pi's and this device's clocks differ
-            if (!w.call && workingSel) {
-                lastSel = { ...workingSel, reason: "last" };
-                workingSel = undefined;
-            }
-            working = w;
-            tick(true);
-        },
         qsos: (q) => {
             qsos = q;
             tick(true);
-        },
-        wsjtx: (i) => {
-            wsjtx = i;
         },
         wavelog: (w) => {
             wavelog = w;
@@ -126,8 +131,6 @@ async function main() {
     });
     const select = (sel) => {
         manual = sel ? { sel: { ...sel, reason: "manual" }, at: Date.now() } : undefined;
-        if (!sel)
-            lastSel = undefined;
         tick(true);
     };
     const panels = [topbar, map, ...sideItems.map(([p]) => p)];
@@ -138,17 +141,22 @@ async function main() {
             return;
         lastFull = now;
         store.prune(now);
-        // WSJT-X sends status at least every 15 s while it's running.
-        const radio = working && now - working.updated < 60_000 ? working : undefined;
-        const active = settings.followRadio && radio?.b ? { band: radio.b, mode: radio.m } : undefined;
+        // Band/mode you're on, from your own spots; the display follows it.
+        const recent = store.filtered({ ...settings, maxAgeMin: Math.max(settings.maxAgeMin, 10) }, now, cfg);
+        const onAir = onAirFrom(recent, now);
+        const active = settings.followRadio && onAir ? { band: onAir.band, mode: onAir.mode } : undefined;
         const spots = store.filtered(settings, now, cfg, active);
+        // DX: a station you clicked (for a few minutes), else your last QSO.
         if (manual && now - manual.at > MANUAL_HOLD_MS)
             manual = undefined;
-        const dx = (radio && workingSel) || manual?.sel || lastSel;
+        const q = qsos[0];
+        const last = q && q.lat != null && q.lon != null && now - q.t < LAST_QSO_MS
+            ? { call: q.call, lat: q.lat, lon: q.lon, grid: q.grid, reason: "last" }
+            : undefined;
+        const dx = manual?.sel || last;
         const ctx = {
             now, spots, allCount: store.size, ratePerMin: store.ratePerMin,
-            solar, connected, dx, select,
-            working: radio, qsos, active, wavelog, wsjtx,
+            solar, connected, dx, select, qsos, wavelog, onAir, active,
         };
         for (const p of panels) {
             if (p.el.hidden)

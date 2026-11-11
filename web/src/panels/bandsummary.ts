@@ -93,7 +93,7 @@ export class BandSummary implements Panel {
           const label = b.snr.size > 1 || mode !== "FT8" ? ` <span class="muted">${mode}</span>` : "";
           return `<span class="snr ${level(mode, avg)}" title="${list.length} report${list.length > 1 ? "s" : ""}, ${Math.min(...list)} to ${Math.max(...list)} dB">${avg > 0 ? "+" : ""}${avg}${label}</span>`;
         }).join(" ");
-      const cur = ctx.working?.b === band ? " cur" : "";
+      const cur = ctx.onAir?.band === band ? " cur" : "";
       return `<div class="srow${cur}" data-band="${band}" title="Click to show the farthest station as DX">
         <span class="chip" style="--c:${bandColor(band)}">${band}</span>
         <span class="track"><span class="fill" style="width:${(b.n / max) * 100}%;background:${bandColor(band)}"></span></span>

@@ -50,7 +50,7 @@ func (c *CTY) Loaded() bool {
 // or older than a week. Failure to download is not fatal.
 func (c *CTY) LoadOrFetch(path, url string) error {
 	if st, err := os.Stat(path); (err != nil || time.Since(st.ModTime()) > 7*24*time.Hour) && url != "" {
-		if err := download(path, url); err != nil {
+		if err := Download(path, url); err != nil {
 			log.Printf("cty: download failed (%v); using existing file if present", err)
 		} else {
 			log.Printf("cty: downloaded %s", url)
@@ -64,7 +64,8 @@ func (c *CTY) LoadOrFetch(path, url string) error {
 	return c.Parse(f)
 }
 
-func download(path, url string) error {
+// Download fetches url to path atomically.
+func Download(path, url string) error {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {

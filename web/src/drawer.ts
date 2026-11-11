@@ -35,9 +35,8 @@ export function initDrawer(
         ${checkbox("clock", "Clock")}${checkbox("solar", "Solar")}
         ${checkbox("dedx", "DE / DX")}${checkbox("mySignal", "My signal")}
         ${checkbox("dxSpots", "DX near me")}${checkbox("log", "QSOs")}
-        ${checkbox("heardHere", "Heard here (what I decode)")}${checkbox("arcs", "Path lines")}
+        ${checkbox("arcs", "Lines to stations hearing me")}
         ${checkbox("grayline", "Gray line")}
-        <label class="check"><input type="checkbox" data-globe ${s.globe ? "checked" : ""}> Globe view</label>
       </div>
 
       <h3>Map zoom <span class="muted">${s.map.zoom === 0 ? "whole world" : `+${s.map.zoom}`}</span></h3>
@@ -61,10 +60,10 @@ export function initDrawer(
       <h3>Keep spots for</h3>
       <select data-age>${[5, 10, 15, 30, 60].map((m) => `<option value="${m}" ${s.maxAgeMin === m ? "selected" : ""}>${m} minutes</option>`).join("")}</select>
 
-      <h3>Radio</h3>
-      <label class="check"><input type="checkbox" data-follow ${s.followRadio ? "checked" : ""}> Follow WSJT-X: show DX on my current band and mode, fade other bands on the map</label>
+      <h3>On air</h3>
+      <label class="check"><input type="checkbox" data-follow ${s.followRadio ? "checked" : ""}> Follow my spots: show DX on the band and mode I'm being heard on, fade other bands on the map</label>
 
-      <h3 id="dx-filters">DX near me <span class="muted">${s.followRadio ? "(used when the radio is idle)" : ""}</span></h3>
+      <h3 id="dx-filters">DX near me <span class="muted">${s.followRadio ? "(used when you haven't been spotted recently)" : ""}</span></h3>
       <div class="chips">${Object.keys(MODE_GROUPS).map((m) =>
         `<button data-mode="${m}" class="chip ${s.dx.modes.includes(m) ? "on" : ""}">${m}</button>`).join("")}</div>
       <div class="chips">${BANDS.map((b) =>
@@ -106,7 +105,6 @@ export function initDrawer(
     const s = structuredClone(get());
     if (t.dataset.show) s.show[t.dataset.show as keyof Settings["show"]] = t.checked;
     else if (t.dataset.dx) s.dx[t.dataset.dx as "hideCountry" | "hideCont"] = t.checked;
-    else if ("globe" in t.dataset) s.globe = t.checked;
     else if ("follow" in t.dataset) { s.followRadio = t.checked; set(s); keepScroll(render); return; }
     else if (t.dataset.src) s.sources[t.dataset.src] = t.checked;
     else if ("age" in t.dataset) s.maxAgeMin = Number(t.value);
@@ -152,5 +150,5 @@ function contName(c: string): string {
 }
 
 function srcName(k: string): string {
-  return ({ pskr: "PSK Reporter", wsjtx: "WSJT-X", rbn: "RBN", cluster: "DX cluster", demo: "Demo" } as Record<string, string>)[k] ?? k;
+  return ({ pskr: "PSK Reporter", rbn: "RBN", cluster: "DX cluster", demo: "Demo" } as Record<string, string>)[k] ?? k;
 }

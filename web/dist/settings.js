@@ -8,12 +8,11 @@ export const PRESETS = {
 };
 export const DEFAULTS = {
     preset: "balanced",
-    show: { clock: true, solar: true, dedx: true, mySignal: true, heardHere: false, dxSpots: true, log: true, arcs: true, grayline: true },
+    show: { clock: true, solar: true, dedx: true, mySignal: true, dxSpots: true, log: true, arcs: true, grayline: true },
     scale: 1,
     theme: "dark",
-    globe: false,
     maxAgeMin: 15,
-    sources: { pskr: true, wsjtx: true, rbn: true, cluster: true, demo: true },
+    sources: { pskr: true, rbn: true, cluster: true, demo: true },
     dx: { bands: [], modes: [], hideCountry: true, hideCont: false },
     followRadio: true,
     map: { zoom: 0, center: "home" },
@@ -26,7 +25,7 @@ export function mergeSettings(saved) {
     return {
         ...d, ...saved,
         show: { ...d.show, ...saved.show },
-        sources: { ...d.sources, ...saved.sources },
+        sources: Object.fromEntries(Object.keys(d.sources).map((k) => [k, saved.sources?.[k] ?? d.sources[k]])),
         dx: { ...d.dx, ...saved.dx },
         map: { ...d.map, ...saved.map },
     };

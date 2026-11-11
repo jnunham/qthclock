@@ -4,21 +4,14 @@
   "grid": "FN31pr",
   "webDir": "web",
   "dataDir": "data",
-  "mapStyle": "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
   "historyMinutes": 30,
   "historyMax": 20000,
-
   "pskreporter": {
     "enabled": true,
     "addr": "mqtt.pskreporter.info:1883",
     "topics": [
-      "pskr/filter/v2/+/+/{CALL}/#",
-      "pskr/filter/v2/+/+/+/{CALL}/#"
+      "pskr/filter/v2/+/+/{CALL}/#"
     ]
-  },
-  "wsjtx": {
-    "enabled": true,
-    "listen": "0.0.0.0:2237"
   },
   "nearKm": 1500,
   "wavelog": {
@@ -30,7 +23,10 @@
   },
   "rbn": {
     "enabled": true,
-    "addrs": ["telnet.reversebeacon.net:7000", "telnet.reversebeacon.net:7001"]
+    "addrs": [
+      "telnet.reversebeacon.net:7000",
+      "telnet.reversebeacon.net:7001"
+    ]
   },
   "cluster": {
     "enabled": false,
@@ -46,5 +42,6 @@
   "demo": {
     "enabled": false,
     "rate": 4
-  }
+  },
+  "worldUrl": "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"
 }

@@ -4,10 +4,10 @@ A shack display built around **your station**. It combines HamClock's at-a-glanc
 
 - **My signal:** who is hearing you right now on each band, the **average signal report** you're getting (each station's latest report, averaged per mode), and the farthest station (PSK Reporter + RBN).
 - **DX near you:** cluster and RBN spots heard by skimmers close to your QTH, so these are stations you can very likely work. Filter by the modes and bands you're working; your own country is hidden by default (optionally your whole continent).
-- **QSOs:** who you're working right now (live from WSJT-X, with TX/RX) and your latest QSOs from **Wavelog** and/or WSJT-X. Starting a QSO makes that station the DX automatically.
-- **Heard here** (off by default): what your own receiver is decoding, fed live from WSJT-X / JTDX.
-- **DE / DX:** your location and the selected station's: local time, sunrise and sunset, short- and long-path bearing and distance. Click any station on the map or in a list to make it the DX.
-- **Map** of the whole world with the gray line. Lines and dots run from you to each **station hearing you** (dot = where that station is); hollow rings are **DX spotted near you** that you could work; the white line is the station you're **working now**. Colour = band.
+- **On air:** the band and mode you're on, worked out from who's hearing you (like HamSpotter / HamAlert). No radio connection needed.
+- **QSOs:** your latest QSOs from **Wavelog**. Your last QSO partner is shown as the DX.
+- **DE / DX:** your location and your last QSO partner's (or any station you click): local time, sunrise and sunset, short- and long-path bearing and distance.
+- **Map** of the whole world (flat, HamClock-style) with the gray line. Lines run from you to each **station hearing you** (the dot is where that station is); hollow rings are **DX spotted near you** that you could work; a white circle marks the DX / your last QSO. Colour = band.
 - **Solar:** SFI, Kp and X-ray class from NOAA.
 
 ![QTHClock in demo mode](docs/screenshot.png)
@@ -52,9 +52,9 @@ Press **s**, or click the gear, for layout, text size, theme and filters. Kiosk 
 
 QTHClock is built to run on a screen nobody touches:
 
-- **It follows the radio.** WSJT-X sends QTHClock your dial frequency and mode, and the top bar shows your current band, mode, frequency and TX/RX. While WSJT-X is running, "DX near you" shows only your current band and mode, the map fades the other bands, and "My signal" highlights your band. When WSJT-X is closed, the DX list goes back to your saved filters. To turn this off, untick Settings › Radio › Follow WSJT-X.
-- **The DX box follows your QSOs.** It shows the station you're working, with a path drawn on the map; after the QSO it keeps that station (marked "last QSO", no path) until your next one. A station you click stays selected for 3 minutes. The farthest station hearing you is listed under "My signal".
-- **The map shows the world once**, sized to fill the panel on any screen shape (including 34" ultrawides), instead of repeating side by side. Zoom with the **+ / − / ⌂** buttons on the map (they hide when the mouse is idle) or from **Settings › Map zoom** on your phone; zoom is centred on your QTH by default. Lines and dots get thicker on bigger screens.
+- **It follows you on the air.** The top bar shows the band and mode you're being spotted on (from PSK Reporter / RBN reports of your call over the last 10 minutes). "DX near you" then shows only that band and mode, the map fades the other bands, and "My signal" highlights your band. When nobody has spotted you for 10 minutes, the DX list goes back to your saved filters. To turn this off, untick Settings › On air › Follow my spots.
+- **The DX box shows your last QSO** from Wavelog (for 2 hours). A station you click on the map or in a list stays selected for 3 minutes. The farthest station hearing you is listed under "My signal".
+- **The map always fits the whole world once**, on any screen shape (including 34" ultrawides). Zoom with the **+ / − / ⌂** buttons on the map (they hide when the mouse is idle) or from **Settings › Map zoom** on your phone; zooming centres on your QTH by default. Lines and dots get thicker on bigger screens. The coastlines and borders (Natural Earth, public domain) are downloaded once to `data/world.json` on first start.
 - **You control it from any other device.** Open `http://<pi-address>:8073` on your phone or laptop and change settings there; the monitor updates instantly. Settings are stored on the server (`data/display.json`), not in one browser.
 - **It updates itself.** After a `git pull` and restart, open screens reload the new version automatically.
 - **Per-screen tweaks** go in the URL and only affect that screen, e.g. `http://localhost:8073/?scale=1.3&preset=balanced`.
@@ -103,17 +103,7 @@ To test the connection, run this on the Pi:
 ./qthclock -check-wavelog
 ```
 
-It prints the newest QSOs, or exactly what went wrong (wrong URL, bad key, missing `stationId`, Wavelog too old for a v2 token, and so on). The same error also shows in the QSO panel on the display. QSOs logged in WSJT-X appear immediately and are merged with the Wavelog entry when it arrives.
-
-### WSJT-X / JTDX
-
-In WSJT-X, open **Settings › Reporting** and set **UDP Server** to the address of the computer running QTHClock, port `2237`, with "Accept UDP requests" ticked:
-
-- **WSJT-X on the same computer as QTHClock:** `127.0.0.1`.
-- **WSJT-X on your shack PC, QTHClock on a Pi:** the Pi's IP address (the display tells you which one while the radio shows as idle). Make sure `config.json` has `"wsjtx": {"enabled": true, "listen": "0.0.0.0:2237"}`; older configs had `127.0.0.1:2237`, which only accepts data from the Pi itself.
-- **Already using GridTracker?** Leave WSJT-X and GridTracker exactly as they are. In GridTracker go to **Settings › General › Forward UDP Messages**, enter the Pi's IP address and port `2237`, and tick it on. GridTracker passes everything WSJT-X sends on to QTHClock. (JTAlert and most loggers have a similar "forward/rebroadcast UDP" option. Multicast, e.g. `224.0.0.73:2237` in every program, also works.)
-
-This gives QTHClock your band, mode and frequency, who you're working, TX/RX state, the QSOs you log and (if enabled) what you decode. When nothing is coming in, the top bar says why (no data yet, port in use, last heard N minutes ago).
+It prints the newest QSOs, or exactly what went wrong (wrong URL, bad key, missing `stationId`, Wavelog too old for a v2 token, and so on). The same error also shows in the QSO panel on the display.
 
 ## Config highlights
 
@@ -121,11 +111,10 @@ This gives QTHClock your band, mode and frequency, who you're working, TX/RX sta
 |---|---|
 | `callsign`, `grid` | Your station (asked for on first launch). Needed for "who hears me", distances and "near me". |
 | `nearKm` | A cluster/RBN spot is "near you" if its spotter is within this distance (default 1500 km). |
-| `pskreporter.topics` | MQTT topics; `{CALL}` becomes your callsign. Defaults: who hears you, and who you hear. |
+| `pskreporter.topics` | MQTT topics; `{CALL}` becomes your callsign. Default: who hears you. |
 | `rbn.addrs` | `telnet.reversebeacon.net:7000` is CW/RTTY skimmers, `:7001` is FT8/FT4. Both are on by default; drop one if you never use those modes. |
 | `wavelog` | Your Wavelog logbook (see above). |
 | `cluster` | Any DXSpider/AR-Cluster telnet node. |
-| `wsjtx.listen` | UDP address for WSJT-X decodes. |
 
 ## How it works
 
@@ -133,8 +122,8 @@ This gives QTHClock your band, mode and frequency, who you're working, TX/RX sta
  PSK Reporter MQTT ─┐
  RBN telnet ────────┤    Go server                               browser(s)
  DX cluster telnet ─┼─► normalise → locate → RELEVANCE → dedupe ─► SSE /api/stream
- WSJT-X UDP ────────┘                 │ "me"   someone heard me
- NOAA SWPC (10 min) ───────────────►  │ "here" I heard them
+ Wavelog (1 min) ───┘                 │ "me"   someone heard me
+ NOAA SWPC (10 min) ───────────────►  │
                                       │ "near" spotter within nearKm of my QTH
                                       └ anything else is dropped
 ```
@@ -150,15 +139,14 @@ This gives QTHClock your band, mode and frequency, who you're working, TX/RX sta
 | `server/internal/sources/relevance.go` | The "is this about me?" filter |
 | `server/internal/sources/pskr.go`, `mqtt.go` | PSK Reporter feed (tiny built-in MQTT client) |
 | `server/internal/sources/telnet.go` | RBN and DX cluster |
-| `server/internal/sources/wsjtx.go` | WSJT-X UDP decodes |
 | `server/internal/sources/demo.go` | Fake traffic for UI work |
 | `server/internal/geo`, `solar`, `spots` | Grids and cty.dat, NOAA, hub |
 | `web/src/panels/dedx.ts` | DE / DX box |
-| `web/src/panels/bandsummary.ts` | My signal / Heard here |
+| `web/src/panels/bandsummary.ts` | My signal |
 | `web/src/panels/dxspots.ts` | DX near you |
-| `web/src/panels/qsos.ts` | Now working + recent QSOs |
+| `web/src/panels/qsos.ts` | Recent QSOs |
 | `server/internal/logbook` | Recent QSOs, Wavelog client, ADIF parser |
-| `web/src/panels/map.ts` | MapLibre map with canvas fallback |
+| `web/src/panels/map.ts`, `web/src/world.ts` | The world map (canvas, equirectangular) and its outline loader |
 | `web/src/astro.ts` | Sun times, bearings, distances |
 
 To add a panel: write a class with `el` and `update(ctx)`, add it to `sideItems` in `main.ts`, and add a `show` flag in `settings.ts` plus a checkbox in `drawer.ts`.
@@ -168,7 +156,6 @@ To add a panel: write a class with `el` and `update(ctx)`, add it to `sideItems`
 - Azimuthal (great-circle) map centered on your QTH
 - Band predictions (VOACAP) from your QTH to the selected DX and to each continent
 - Flag new countries / band-slots in "DX near you" using Wavelog's lookup API
-- Rig control (flrig / Hamlib): click a spot to tune
+- Radio band/mode from flrig / Hamlib (rigctld) as an alternative to "on air" from spots
 - Rotator control from the DX bearing
 - Satellite passes, NCDXF beacons, contest and DXpedition calendars
-- WSJT-X multicast, plus "my area" reports from PSK Reporter

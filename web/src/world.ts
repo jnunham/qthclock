@@ -13,14 +13,12 @@ export interface World {
 
 interface Packed { v: number; land: number[][][]; lakes: number[][][]; borders: number[][]; states: number[][] }
 
-let cached: Promise<World | undefined> | undefined;
-
+/** Fetch the outlines; undefined if the server hasn't finished building them yet. */
 export function loadWorld(): Promise<World | undefined> {
-  cached ??= fetch("api/world")
+  return fetch("api/world", { cache: "no-store" })
     .then((r) => (r.ok ? r.json() : undefined))
     .then((p) => (p && (p as Packed).v ? unpack(p as Packed) : undefined))
     .catch(() => undefined);
-  return cached;
 }
 
 export function unpack(p: Packed): World {

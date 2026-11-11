@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -46,6 +47,7 @@ func EnsureBasemap(path string) error {
 			return nil
 		}
 	}
+	log.Printf("map: downloading Natural Earth map outlines (about 4 MB, one time)...")
 	bm := Basemap{V: basemapVersion}
 	for _, l := range basemapLayers {
 		raw, err := fetchLayer(l.file)

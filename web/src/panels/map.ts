@@ -60,16 +60,26 @@ export class WorldMap implements Panel {
     this.el = el;
     this.canvas = document.createElement("canvas");
     el.append(this.canvas);
-    loadWorld().then((w) => {
-      this.world = w;
-      this.baseKey = ""; // redraw the base layer with coastlines
-      if (!w) {
-        const note = document.createElement("div");
-        note.className = "map-note muted";
-        note.textContent = "Map outline not downloaded yet (needs internet once) · showing grid";
-        el.append(note);
-      }
-    });
+    // The server builds the outlines on first start (a few seconds to
+    // download); keep asking until they're ready, then redraw.
+    const note = document.createElement("div");
+    note.className = "map-note muted";
+    const tryLoad = (attempt: number) => {
+      loadWorld().then((w) => {
+        if (w) {
+          this.world = w;
+          this.baseKey = "";
+          note.remove();
+          return;
+        }
+        if (attempt === 1) {
+          note.textContent = "Map outlines are still downloading on the QTHClock server · showing grid";
+          el.append(note);
+        }
+        setTimeout(() => tryLoad(attempt + 1), Math.min(60_000, 5_000 * attempt));
+      });
+    };
+    tryLoad(0);
     this.canvas.addEventListener("click", (e) => {
       const r = this.canvas.getBoundingClientRect();
       const x = e.clientX - r.left, y = e.clientY - r.top;

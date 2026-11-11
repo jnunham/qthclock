@@ -76,8 +76,24 @@ func main() {
 	// data/basemap.json. The map shows a plain grid until it's ready.
 	worldPath := filepath.Join(cfg.DataDir, "basemap.json")
 	go func() {
-		if err := geo.EnsureBasemap(worldPath); err != nil {
-			log.Printf("map: couldn't download the map outlines (%v); showing a grid map", err)
+		// Retry a few times: right after boot the network may not be up yet.
+		for attempt, wait := 1, 30*time.Second; ; attempt, wait = attempt+1, wait*2 {
+			err := geo.EnsureBasemap(worldPath)
+			if err == nil {
+				log.Printf("map: outlines ready (%s)", worldPath)
+				return
+			}
+			log.Printf("map: couldn't download the map outlines: %v", err)
+			if attempt == 5 || ctx.Err() != nil {
+				log.Printf("map: giving up for now; restart QTHClock to try again, or see README (QTHCLOCK_NATURAL_EARTH) for an offline install")
+				return
+			}
+			log.Printf("map: retrying in %s", wait)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(wait):
+			}
 		}
 	}()
 
@@ -100,7 +116,11 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/world", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "max-age=86400")
+		if _, err := os.Stat(worldPath); err != nil {
+			http.Error(w, "map outlines not ready yet", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeFile(w, r, worldPath)
 	})
 	mux.HandleFunc("GET /api/aurora.jpg", func(w http.ResponseWriter, r *http.Request) {

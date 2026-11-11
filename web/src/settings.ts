@@ -13,6 +13,7 @@ export interface Settings {
     mySignal: boolean;
     heardHere: boolean;
     dxSpots: boolean;
+    log: boolean;
     arcs: boolean;
     grayline: boolean;
   };
@@ -20,9 +21,15 @@ export interface Settings {
   theme: Theme;
   globe: boolean;
   maxAgeMin: number;      // hide spots older than this
+  sources: Record<string, boolean>;
+  dx: DXFilter;           // filters for "DX near you"
+}
+
+export interface DXFilter {
   bands: string[];        // empty = all bands
   modes: string[];        // mode groups; empty = all
-  sources: Record<string, boolean>;
+  hideCountry: boolean;   // hide stations in my own DXCC entity
+  hideCont: boolean;      // hide stations on my continent
 }
 
 export const PRESETS: Record<Preset, { label: string; side: "right" | "bottom" | "none"; size: string }> = {
@@ -34,17 +41,16 @@ export const PRESETS: Record<Preset, { label: string; side: "right" | "bottom" |
 
 export const DEFAULTS: Settings = {
   preset: "balanced",
-  show: { clock: true, solar: true, dedx: true, mySignal: true, heardHere: true, dxSpots: true, arcs: true, grayline: true },
+  show: { clock: true, solar: true, dedx: true, mySignal: true, heardHere: false, dxSpots: true, log: true, arcs: true, grayline: true },
   scale: 1,
   theme: "dark",
   globe: false,
   maxAgeMin: 15,
-  bands: [],
-  modes: [],
   sources: { pskr: true, wsjtx: true, rbn: true, cluster: true, demo: true },
+  dx: { bands: [], modes: [], hideCountry: true, hideCont: false },
 };
 
-const KEY = "qthclock.settings.v1";
+const KEY = "qthclock.settings.v2";
 
 export function loadSettings(): Settings {
   let s: Settings = structuredClone(DEFAULTS);
@@ -52,7 +58,7 @@ export function loadSettings(): Settings {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const saved = JSON.parse(raw);
-      s = { ...s, ...saved, show: { ...s.show, ...saved.show }, sources: { ...s.sources, ...saved.sources } };
+      s = { ...s, ...saved, show: { ...s.show, ...saved.show }, sources: { ...s.sources, ...saved.sources }, dx: { ...s.dx, ...saved.dx } };
     }
   } catch {
     /* storage unavailable or corrupt: fall back to defaults */

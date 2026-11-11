@@ -2,10 +2,12 @@ package sources
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
 
 	"qthclock/internal/geo"
+	"qthclock/internal/logbook"
 	"qthclock/internal/spots"
 )
 
@@ -17,15 +19,18 @@ type Demo struct {
 	Grid string
 	Pub  func(spots.Spot)
 	Rate int // spots per second
+
+	OnStatus func(logbook.Working)
+	OnLogged func(logbook.QSO)
 }
 
-var demoStations = []struct{ call, grid string }{
-	{"K1TTT", "FN32"}, {"W3LPL", "FM19"}, {"N6TV", "CM97"}, {"VE7CC", "CN89"}, {"KH6LC", "BL10"},
-	{"JA1YRL", "PM95"}, {"VK2GOM", "QF56"}, {"ZL2IFB", "RE78"}, {"DL8LAS", "JO53"}, {"G4ZFE", "IO91"},
-	{"EA8RM", "IL18"}, {"PY2PLL", "GG66"}, {"LU4FPZ", "FF97"}, {"ZS6RO", "KG44"}, {"5Z4B", "KI88"},
-	{"A65BP", "LL75"}, {"VU2PTT", "MK82"}, {"BG4WDT", "PM01"}, {"HS0ZGQ", "OK03"}, {"9V1RM", "OJ11"},
-	{"UA9OA", "NO14"}, {"RA0FF", "QN16"}, {"OH6BG", "KP02"}, {"TF3ML", "HP94"}, {"KL7SB", "BP51"},
-	{"XE1H", "EK09"}, {"CO8LY", "FL20"}, {"VP8NO", "GD18"}, {"FK8HA", "RG37"}, {"3B8CW", "LG89"},
+var demoStations = []struct{ call, grid, country, cont string }{
+	{"K1TTT", "FN32", "United States", "NA"}, {"W3LPL", "FM19", "United States", "NA"}, {"N6TV", "CM97", "United States", "NA"}, {"VE7CC", "CN89", "Canada", "NA"}, {"KH6LC", "BL10", "Hawaii", "OC"},
+	{"JA1YRL", "PM95", "Japan", "AS"}, {"VK2GOM", "QF56", "Australia", "OC"}, {"ZL2IFB", "RE78", "New Zealand", "OC"}, {"DL8LAS", "JO53", "Fed. Rep. of Germany", "EU"}, {"G4ZFE", "IO91", "England", "EU"},
+	{"EA8RM", "IL18", "Canary Islands", "AF"}, {"PY2PLL", "GG66", "Brazil", "SA"}, {"LU4FPZ", "FF97", "Argentina", "SA"}, {"ZS6RO", "KG44", "South Africa", "AF"}, {"5Z4B", "KI88", "Kenya", "AF"},
+	{"A65BP", "LL75", "United Arab Emirates", "AS"}, {"VU2PTT", "MK82", "India", "AS"}, {"BG4WDT", "PM01", "China", "AS"}, {"HS0ZGQ", "OK03", "Thailand", "AS"}, {"9V1RM", "OJ11", "Singapore", "AS"},
+	{"UA9OA", "NO14", "Asiatic Russia", "AS"}, {"RA0FF", "QN16", "Asiatic Russia", "AS"}, {"OH6BG", "KP02", "Finland", "EU"}, {"TF3ML", "HP94", "Iceland", "EU"}, {"KL7SB", "BP51", "Alaska", "NA"},
+	{"XE1H", "EK09", "Mexico", "NA"}, {"CO8LY", "FL20", "Cuba", "NA"}, {"VP8NO", "GD18", "Falkland Islands", "SA"}, {"FK8HA", "RG37", "New Caledonia", "OC"}, {"3B8CW", "LG89", "Mauritius", "AF"},
 }
 
 // Skimmers in eastern North America, so "near me" works for a US default grid.
@@ -57,6 +62,7 @@ func (d *Demo) Run(ctx context.Context) {
 	for _, b := range demoBands {
 		total += b.weight
 	}
+	go d.qsoLoop(ctx)
 	tick := time.NewTicker(time.Second / time.Duration(d.Rate))
 	defer tick.Stop()
 	for {
@@ -91,6 +97,7 @@ func (d *Demo) Run(ctx context.Context) {
 			if rand.Intn(3) == 0 {
 				s.Source, s.Mode, s.FreqKHz, s.SNR = "cluster", "SSB", b.f+180+rand.Float64()*60, nil
 			}
+			s.DXCountry, s.DXCont = other.country, other.cont
 			if la, lo, ok := geo.GridToLatLon(other.grid); ok {
 				s.DXLat, s.DXLon = spots.F(la), spots.F(lo)
 			}
@@ -111,3 +118,44 @@ func (d *Demo) Run(ctx context.Context) {
 		d.Pub(s)
 	}
 }
+
+// qsoLoop pretends to work a station every ~40 s: call, alternate TX/RX in
+// 15 s FT8 periods, log it, repeat. Seeds a few past QSOs first.
+func (d *Demo) qsoLoop(ctx context.Context) {
+	if d.OnStatus == nil || d.OnLogged == nil {
+		return
+	}
+	now := time.Now()
+	for i := 5; i >= 1; i-- {
+		o := demoStations[rand.Intn(len(demoStations))]
+		d.OnLogged(logbook.QSO{Call: o.call, Grid: o.grid, Country: o.country, Time: now.Add(-time.Duration(i*4) * time.Minute).UnixMilli(),
+			Band: "20m", Mode: "FT8", RSTSent: snrStr(), RSTRcvd: snrStr(), Source: "wsjtx"})
+	}
+	for {
+		o := demoStations[rand.Intn(len(demoStations))]
+		start := time.Now()
+		for p := 0; p < 4; p++ {
+			w := logbook.Working{Call: o.call, Grid: o.grid, FreqKHz: 14074, Mode: "FT8", Report: snrStr(), TxEnabled: true,
+				Transmitting: p%2 == 0, Updated: time.Now().UnixMilli()}
+			if la, lo, ok := geo.GridToLatLon(o.grid); ok {
+				w.Lat, w.Lon = spots.F(la), spots.F(lo)
+			}
+			d.OnStatus(w)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(10 * time.Second):
+			}
+		}
+		d.OnLogged(logbook.QSO{Call: o.call, Grid: o.grid, Country: o.country, Time: start.UnixMilli(), Band: "20m", Mode: "FT8",
+			RSTSent: snrStr(), RSTRcvd: snrStr(), Source: "wsjtx"})
+		d.OnStatus(logbook.Working{FreqKHz: 14074, Mode: "FT8", Updated: time.Now().UnixMilli()})
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
+	}
+}
+
+func snrStr() string { return fmt.Sprintf("%+03d", rand.Intn(30)-22) }

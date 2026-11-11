@@ -7,22 +7,27 @@ const MAX_ROWS = 60;
  */
 export class DXSpots {
     cfg;
+    settings;
+    openFilters;
     el;
     tbody;
     byId = new Map();
     seen = new Set();
     ctx;
-    constructor(cfg) {
+    constructor(cfg, settings, openFilters) {
         this.cfg = cfg;
+        this.settings = settings;
+        this.openFilters = openFilters;
         this.el = document.createElement("section");
         this.el.className = "panel dxspots";
         this.el.innerHTML = `
-      <h2>DX near you <span class="muted">spotted within ${Math.round(cfg.nearKm).toLocaleString()} km</span></h2>
+      <h2>DX near you <button class="filters" title="Change DX filters"></button></h2>
       <div class="scroll"><table>
         <thead><tr><th>UTC</th><th class="num">kHz</th><th>Band</th><th>Mode</th><th>DX</th><th class="num">Az</th><th class="num">km</th><th class="num">Spots</th></tr></thead>
         <tbody></tbody>
       </table></div>`;
         this.tbody = this.el.querySelector("tbody");
+        this.el.querySelector(".filters").addEventListener("click", () => this.openFilters());
         this.tbody.addEventListener("click", (e) => {
             const tr = e.target.closest("tr[data-id]");
             const s = tr && this.byId.get(Number(tr.dataset.id));
@@ -33,6 +38,14 @@ export class DXSpots {
     }
     update(ctx) {
         this.ctx = ctx;
+        const f = this.settings().dx;
+        const parts = [
+            f.modes.length ? f.modes.join(" ") : "all modes",
+            f.bands.length ? f.bands.join(" ") : "all bands",
+            f.hideCont ? `no ${this.cfg.cont ?? "home continent"}` : f.hideCountry ? `no ${this.cfg.country ?? "home country"}` : "",
+            `≤${Math.round(this.cfg.nearKm).toLocaleString()} km`,
+        ].filter(Boolean);
+        this.el.querySelector(".filters").textContent = parts.join(" · ") + " ▾";
         const groups = new Map();
         for (const s of ctx.spots) {
             if (s.rel !== "near")
@@ -47,7 +60,7 @@ export class DXSpots {
         const rows = [...groups.values()].slice(0, MAX_ROWS);
         this.byId.clear();
         if (!rows.length) {
-            this.tbody.innerHTML = `<tr><td colspan="8" class="muted hint">No DX spotted near you yet. RBN and cluster spots appear here once a nearby skimmer hears something.</td></tr>`;
+            this.tbody.innerHTML = `<tr><td colspan="8" class="muted hint">No DX matching your filters has been spotted near you yet. Spots appear when a skimmer or cluster user within ${Math.round(this.cfg.nearKm).toLocaleString()} km hears something.</td></tr>`;
             return;
         }
         const { lat, lon } = this.cfg;
@@ -60,7 +73,7 @@ export class DXSpots {
             const az = lat != null && lon != null && s.dxla != null && s.dxlo != null ? Math.round(bearing(lat, lon, s.dxla, s.dxlo)) : "";
             const d = new Date(s.t);
             const sel = ctx.dx?.call === s.dx ? "sel" : "";
-            return `<tr data-id="${s.id}" class="${fresh ? "fresh" : ""} ${sel}" title="${esc(`${s.c ?? ""} · spotted by ${s.de} via ${s.src}`)}">
+            return `<tr data-id="${s.id}" class="${fresh ? "fresh" : ""} ${sel}" title="${esc(`${s.dxc ?? ""} · ${s.c ?? ""} · spotted by ${s.de} via ${s.src}`)}">
         <td class="muted">${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}</td>
         <td class="num">${s.f.toFixed(1)}</td>
         <td><span class="chip" style="--c:${bandColor(s.b)}">${s.b}</span></td>

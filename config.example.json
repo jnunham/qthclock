@@ -21,9 +21,16 @@
     "listen": "127.0.0.1:2237"
   },
   "nearKm": 1500,
+  "wavelog": {
+    "enabled": false,
+    "url": "https://your-wavelog.example.com",
+    "apiKey": "",
+    "stationId": "",
+    "intervalSeconds": 60
+  },
   "rbn": {
     "enabled": true,
-    "addrs": ["telnet.reversebeacon.net:7000"]
+    "addrs": ["telnet.reversebeacon.net:7000", "telnet.reversebeacon.net:7001"]
   },
   "cluster": {
     "enabled": false,

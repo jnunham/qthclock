@@ -8,23 +8,22 @@ export const PRESETS = {
 };
 export const DEFAULTS = {
     preset: "balanced",
-    show: { clock: true, solar: true, dedx: true, mySignal: true, heardHere: true, dxSpots: true, arcs: true, grayline: true },
+    show: { clock: true, solar: true, dedx: true, mySignal: true, heardHere: false, dxSpots: true, log: true, arcs: true, grayline: true },
     scale: 1,
     theme: "dark",
     globe: false,
     maxAgeMin: 15,
-    bands: [],
-    modes: [],
     sources: { pskr: true, wsjtx: true, rbn: true, cluster: true, demo: true },
+    dx: { bands: [], modes: [], hideCountry: true, hideCont: false },
 };
-const KEY = "qthclock.settings.v1";
+const KEY = "qthclock.settings.v2";
 export function loadSettings() {
     let s = structuredClone(DEFAULTS);
     try {
         const raw = localStorage.getItem(KEY);
         if (raw) {
             const saved = JSON.parse(raw);
-            s = { ...s, ...saved, show: { ...s.show, ...saved.show }, sources: { ...s.sources, ...saved.sources } };
+            s = { ...s, ...saved, show: { ...s.show, ...saved.show }, sources: { ...s.sources, ...saved.sources }, dx: { ...s.dx, ...saved.dx } };
         }
     }
     catch {

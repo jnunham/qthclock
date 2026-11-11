@@ -12,8 +12,10 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"qthclock/internal/geo"
+	"qthclock/internal/logbook"
 	"qthclock/internal/sources"
 	"qthclock/internal/spots"
 )
@@ -26,6 +28,7 @@ type station struct {
 	path     string
 	fileDemo bool
 	hub      *spots.Hub
+	recent   *logbook.Recent
 	loc      sources.Locator
 	parent   context.Context
 	cancel   context.CancelFunc
@@ -87,7 +90,8 @@ func (s *station) start() {
 	ctx, cancel := context.WithCancel(s.parent)
 	s.cancel = cancel
 	cfg := s.cfg
-	hub, loc := s.hub, s.loc
+	hub, loc, recent := s.hub, s.loc, s.recent
+	working := func(w logbook.Working) { hub.SetState("working", w) }
 
 	// Everything goes through the relevance filter: only spots about me, heard
 	// by me, or spotted near me reach the display.
@@ -111,7 +115,8 @@ func (s *station) start() {
 
 	if cfg.Demo.Enabled {
 		log.Printf("demo mode: generating %d fake spots/s around %s", cfg.Demo.Rate, rel.Call)
-		go (&sources.Demo{Call: rel.Call, Grid: cfg.Grid, Pub: pub, Rate: cfg.Demo.Rate}).Run(ctx)
+		go (&sources.Demo{Call: rel.Call, Grid: cfg.Grid, Pub: pub, Rate: cfg.Demo.Rate,
+			OnStatus: working, OnLogged: func(q logbook.QSO) { recent.Add(q) }}).Run(ctx)
 		return
 	}
 	if !cfg.configured() {
@@ -123,7 +128,8 @@ func (s *station) start() {
 			Call: cfg.Callsign, Pub: pub, Locator: loc}).Run(ctx)
 	}
 	if cfg.WSJTX.Enabled {
-		go (&sources.WSJTX{Listen: cfg.WSJTX.Listen, Call: cfg.Callsign, Grid: cfg.Grid, Pub: pub, Locator: loc}).Run(ctx)
+		go (&sources.WSJTX{Listen: cfg.WSJTX.Listen, Call: cfg.Callsign, Grid: cfg.Grid, Pub: pub, Locator: loc,
+			OnStatus: working, OnLogged: func(q logbook.QSO) { recent.Add(q) }}).Run(ctx)
 	}
 	if cfg.RBN.Enabled {
 		for _, a := range cfg.RBN.Addrs {
@@ -132,6 +138,14 @@ func (s *station) start() {
 	}
 	if cfg.Cluster.Enabled {
 		go (&sources.Telnet{Name: "cluster", Addr: cfg.Cluster.Addr, Call: cfg.Callsign, Pub: pub, Locator: loc}).Run(ctx)
+	}
+	if cfg.Wavelog.Enabled {
+		if cfg.Wavelog.URL == "" || cfg.Wavelog.APIKey == "" {
+			log.Printf("wavelog: set \"url\" and \"apiKey\" in config to show your recent QSOs")
+		} else {
+			go (&logbook.Wavelog{URL: cfg.Wavelog.URL, Key: cfg.Wavelog.APIKey, StationID: cfg.Wavelog.StationID,
+				Interval: time.Duration(cfg.Wavelog.IntervalSeconds) * time.Second, Add: recent.Add}).Run(ctx)
+		}
 	}
 }
 

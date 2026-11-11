@@ -15,6 +15,11 @@ import (
 type Locator struct{ CTY *geo.CTY }
 
 func (l Locator) Fill(s *spots.Spot) {
+	if s.DXCountry == "" {
+		if e, _, _, ok := l.CTY.Lookup(s.DX); ok {
+			s.DXCountry, s.DXCont = e.Name, e.Continent
+		}
+	}
 	if s.DXLat == nil {
 		if la, lo, ok := geo.GridToLatLon(s.DXGrid); ok {
 			s.DXLat, s.DXLon = spots.F(la), spots.F(lo)

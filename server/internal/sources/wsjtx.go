@@ -10,7 +10,10 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
+	"qthclock/internal/geo"
+	"qthclock/internal/logbook"
 	"qthclock/internal/spots"
 )
 
@@ -26,7 +29,13 @@ type WSJTX struct {
 	Pub     func(spots.Spot)
 	Locator Locator
 
+	// OnStatus is called with the station currently being worked (Call is
+	// empty between QSOs). OnLogged is called when you log a QSO in WSJT-X.
+	OnStatus func(logbook.Working)
+	OnLogged func(logbook.QSO)
+
 	mu   sync.Mutex
+	last logbook.Working
 	dial map[string]uint64 // client id -> dial frequency Hz, from Status messages
 	mode map[string]string
 }
@@ -76,10 +85,48 @@ func (w *WSJTX) handle(b []byte) {
 	case 1: // Status
 		dial := r.u64()
 		mode := r.str()
-		if r.err == nil {
-			w.mu.Lock()
-			w.dial[id], w.mode[id] = dial, mode
-			w.mu.Unlock()
+		if r.err != nil {
+			return
+		}
+		w.mu.Lock()
+		w.dial[id], w.mode[id] = dial, mode
+		w.mu.Unlock()
+		dxCall, report := r.str(), r.str()
+		r.str() // tx mode
+		txEnabled, transmitting := r.boolean(), r.boolean()
+		r.boolean() // decoding
+		r.u32()     // rx df
+		r.u32()     // tx df
+		r.str()     // de call
+		r.str()     // de grid
+		dxGrid := r.str()
+		if r.err != nil {
+			dxGrid = "" // older WSJT-X versions stop earlier; keep what we have
+		}
+		w.status(logbook.Working{Call: strings.ToUpper(dxCall), Grid: dxGrid, FreqKHz: float64(dial) / 1000, Mode: mode,
+			Report: report, TxEnabled: txEnabled, Transmitting: transmitting})
+	case 5: // QSO Logged
+		off := r.datetime()
+		dxCall, dxGrid := r.str(), r.str()
+		txHz := r.u64()
+		mode, sent, rcvd := r.str(), r.str(), r.str()
+		r.str() // tx power
+		r.str() // comments
+		name := r.str()
+		on := r.datetime()
+		if r.err != nil && dxCall == "" {
+			return
+		}
+		t := on
+		if t == 0 {
+			t = off
+		}
+		if t == 0 {
+			t = time.Now().UnixMilli()
+		}
+		if w.OnLogged != nil {
+			w.OnLogged(logbook.QSO{Call: dxCall, Time: t, Band: spots.BandForKHz(float64(txHz) / 1000), Mode: mode,
+				RSTSent: sent, RSTRcvd: rcvd, Grid: dxGrid, Name: name, Source: "wsjtx"})
 		}
 	case 2: // Decode
 		r.boolean() // new
@@ -111,6 +158,34 @@ func (w *WSJTX) handle(b []byte) {
 		w.Locator.Fill(&s)
 		w.Pub(s)
 	}
+}
+
+// status forwards the "now working" state when it changes, or every 15 s as
+// a heartbeat so the display knows WSJT-X is still running.
+func (w *WSJTX) status(st logbook.Working) {
+	if w.OnStatus == nil {
+		return
+	}
+	now := time.Now().UnixMilli()
+	w.mu.Lock()
+	prev := w.last
+	changed := st.Call != prev.Call || st.Transmitting != prev.Transmitting || st.TxEnabled != prev.TxEnabled ||
+		st.FreqKHz != prev.FreqKHz || st.Mode != prev.Mode || st.Grid != prev.Grid || st.Report != prev.Report
+	if !changed && now-prev.Updated < 15000 {
+		w.mu.Unlock()
+		return
+	}
+	st.Updated = now
+	w.last = st
+	w.mu.Unlock()
+	if st.Call != "" {
+		if la, lo, ok := geo.GridToLatLon(st.Grid); ok {
+			st.Lat, st.Lon = spots.F(la), spots.F(lo)
+		} else if _, la, lo, ok := w.Locator.CTY.Lookup(st.Call); ok {
+			st.Lat, st.Lon = spots.F(la), spots.F(lo)
+		}
+	}
+	w.OnStatus(st)
 }
 
 // parseDecode pulls the transmitting station (and its grid, if sent) out of a
@@ -188,4 +263,19 @@ func (r *qreader) str() string {
 		return ""
 	}
 	return string(r.take(int(n)))
+}
+
+// datetime reads a QDateTime as unix ms (0 if null/invalid).
+func (r *qreader) datetime() int64 {
+	jd := int64(r.u64())
+	ms := int64(r.u32())
+	spec := r.take(1)[0]
+	if spec == 2 { // offset from UTC, seconds
+		off := int64(int32(r.u32()))
+		ms -= off * 1000
+	}
+	if r.err != nil || jd <= 0 {
+		return 0
+	}
+	return (jd-2440588)*86400000 + ms
 }

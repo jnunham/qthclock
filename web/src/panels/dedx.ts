@@ -56,7 +56,7 @@ export class DeDx implements Panel {
         ${deHtml}
       </div>
       <div class="col">
-        <h2>DX ${dx ? '<button class="clear" title="Clear">✕</button>' : ""}</h2>
+        <h2>DX ${ctx.working?.call && dx?.call === ctx.working.call ? '<span class="workbadge">working now</span>' : ""} ${dx ? '<button class="clear" title="Clear">✕</button>' : ""}</h2>
         <div class="big">${dx ? dx.call : "—"}</div>
         ${dxHtml}
       </div>`;

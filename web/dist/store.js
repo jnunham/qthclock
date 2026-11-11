@@ -36,11 +36,9 @@ export class SpotStore {
     get ratePerMin() {
         return this.arrivals.length;
     }
-    /** Spots passing the user's filters, newest first. */
-    filtered(s, now) {
+    /** Spots passing the user's filters, newest first. DX filters apply to "near" spots. */
+    filtered(s, now, cfg) {
         const cut = now - s.maxAgeMin * 60_000;
-        const bands = s.bands.length ? new Set(s.bands) : null;
-        const modes = s.modes.length ? new Set(s.modes) : null;
         const out = [];
         for (let i = this.spots.length - 1; i >= 0; i--) {
             const sp = this.spots[i];
@@ -48,13 +46,26 @@ export class SpotStore {
                 continue;
             if (s.sources[sp.src] === false)
                 continue;
-            if (bands && !bands.has(sp.b))
+            if (sp.rel === "here" && !s.show.heardHere)
                 continue;
-            if (modes && !modes.has(modeGroup(sp.m)))
+            if (sp.rel === "near" && !passesDX(sp, s, cfg))
                 continue;
             out.push(sp);
         }
         return out;
     }
+}
+/** Does a "near" spot pass the operator's DX filters? */
+export function passesDX(sp, s, cfg) {
+    const f = s.dx;
+    if (f.bands.length && !f.bands.includes(sp.b))
+        return false;
+    if (f.modes.length && !f.modes.includes(modeGroup(sp.m)))
+        return false;
+    if (f.hideCountry && cfg.country && sp.dxc === cfg.country)
+        return false;
+    if (f.hideCont && cfg.cont && sp.dxk === cfg.cont)
+        return false;
+    return true;
 }
 //# sourceMappingURL=store.js.map

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"qthclock/internal/geo"
+	"qthclock/internal/logbook"
 	"qthclock/internal/solar"
 	"qthclock/internal/sources"
 	"qthclock/internal/spots"
@@ -57,7 +58,8 @@ func main() {
 		}
 	}()
 
-	st := &station{cfg: cfg, path: *cfgPath, fileDemo: fileDemo, hub: hub, loc: sources.Locator{CTY: cty}, parent: ctx}
+	recent := logbook.NewRecent(10, func(q []logbook.QSO) { hub.SetState("qsos", q) })
+	st := &station{cfg: cfg, path: *cfgPath, fileDemo: fileDemo, hub: hub, recent: recent, loc: sources.Locator{CTY: cty}, parent: ctx}
 	st.start()
 
 	if cfg.Solar.Enabled {
@@ -74,6 +76,12 @@ func main() {
 		if la, lo, ok := geo.GridToLatLon(c.Grid); ok {
 			out["lat"], out["lon"] = la, lo
 		}
+		if e, _, _, ok := cty.Lookup(c.Callsign); ok {
+			out["country"], out["cont"] = e.Name, e.Continent
+		} else if c.Demo.Enabled {
+			out["country"], out["cont"] = "United States", "NA"
+		}
+		out["wavelog"] = c.Wavelog.Enabled && c.Wavelog.URL != "" && c.Wavelog.APIKey != ""
 		writeJSON(w, out)
 	})
 	mux.HandleFunc("POST /api/setup", func(w http.ResponseWriter, r *http.Request) {

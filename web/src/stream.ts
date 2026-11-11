@@ -1,9 +1,11 @@
-import type { Solar, Spot } from "./types.js";
+import type { QSO, Solar, Spot, Working } from "./types.js";
 
 export interface StreamHandlers {
   snapshot(spots: Spot[]): void;
   spots(batch: Spot[]): void;
   solar(s: Solar): void;
+  working(w: Working): void;
+  qsos(q: QSO[]): void;
   status(connected: boolean): void;
 }
 
@@ -24,6 +26,8 @@ export function connectStream(h: StreamHandlers): EventSource {
   es.addEventListener("snapshot", parse<Spot[]>(h.snapshot));
   es.addEventListener("spots", parse<Spot[]>(h.spots));
   es.addEventListener("solar", parse<Solar>(h.solar));
+  es.addEventListener("working", parse<Working>(h.working));
+  es.addEventListener("qsos", parse<QSO[]>(h.qsos));
   es.onopen = () => h.status(true);
   es.onerror = () => h.status(false);
   return es;

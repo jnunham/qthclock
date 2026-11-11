@@ -1,4 +1,4 @@
-import type { DXSelection, Panel, ServerConfig, Solar, UpdateContext } from "./types.js";
+import type { DXSelection, Panel, QSO, ServerConfig, Solar, UpdateContext, Working } from "./types.js";
 import { loadSettings, saveSettings, PRESETS, type Settings } from "./settings.js";
 import { SpotStore } from "./store.js";
 import { connectStream } from "./stream.js";
@@ -9,6 +9,7 @@ import { DeDx } from "./panels/dedx.js";
 import { BandSummary } from "./panels/bandsummary.js";
 import { DXSpots } from "./panels/dxspots.js";
 import { showSetup } from "./setup.js";
+import { QSOPanel } from "./panels/qsos.js";
 
 async function main() {
   const cfg: ServerConfig = await fetch("api/config").then((r) => r.json());
@@ -23,6 +24,8 @@ async function main() {
   let solar: Solar | undefined;
   let connected = false;
   let dx: DXSelection | undefined;
+  let working: Working | undefined;
+  let qsos: QSO[] = [];
 
   const topbar = new TopBar(document.getElementById("topbar")!, cfg, get);
   const map = createMap(document.getElementById("map")!, cfg, get);
@@ -31,10 +34,14 @@ async function main() {
     cfg.callsign ? "Nobody has reported you yet. Call CQ on FT8, or check RBN for CW." : 'Set "callsign" in config.json.');
   const heardHere = new BandSummary("here", "Heard here · what I'm decoding",
     "Nothing decoded yet. In WSJT-X: Settings › Reporting › UDP Server 127.0.0.1:2237.");
-  const dxSpots = new DXSpots(cfg);
+  let openDrawer: (section?: "dx") => void = () => {};
+  const dxSpots = new DXSpots(cfg, get, () => openDrawer("dx"));
+  const qsoPanel = new QSOPanel(cfg);
 
   const side = document.getElementById("side")!;
-  const sideItems: [Panel, keyof Settings["show"]][] = [[dedx, "dedx"], [mySignal, "mySignal"], [heardHere, "heardHere"], [dxSpots, "dxSpots"]];
+  const sideItems: [Panel, keyof Settings["show"]][] = [
+    [dedx, "dedx"], [qsoPanel, "log"], [mySignal, "mySignal"], [heardHere, "heardHere"], [dxSpots, "dxSpots"],
+  ];
   for (const [p] of sideItems) side.append(p.el);
 
   const applyLayout = () => {
@@ -49,10 +56,11 @@ async function main() {
     body.dataset.side = sideVisible ? p.side : "none";
     body.style.setProperty("--side-size", p.size);
     side.hidden = !sideVisible;
+    document.querySelector<HTMLElement>("#legend .lg-here")!.hidden = !settings.show.heardHere;
   };
   applyLayout();
 
-  initDrawer(get, () => showSetup(cfg, false), (s: Settings) => {
+  openDrawer = initDrawer(cfg, get, () => showSetup(cfg, false), (s: Settings) => {
     settings = s;
     saveSettings(s);
     applyLayout();
@@ -63,6 +71,18 @@ async function main() {
     snapshot: (list) => store.replace(list),
     spots: (batch) => store.add(batch),
     solar: (s) => (solar = s),
+    working: (w) => {
+      // Follow WSJT-X: when you start working a new station, make it the DX.
+      if (w.call && w.call !== working?.call && w.lat != null && w.lon != null) {
+        dx = { call: w.call, lat: w.lat, lon: w.lon, grid: w.grid };
+      }
+      working = w;
+      tick(true);
+    },
+    qsos: (q) => {
+      qsos = q;
+      tick(true);
+    },
     status: (ok) => (connected = ok),
   });
 
@@ -80,13 +100,16 @@ async function main() {
     store.prune(now);
     const ctx: UpdateContext = {
       now,
-      spots: store.filtered(settings, now),
+      spots: store.filtered(settings, now, cfg),
       allCount: store.size,
       ratePerMin: store.ratePerMin,
       solar,
       connected,
       dx,
       select,
+      // WSJT-X sends status at least every 15 s while running.
+      working: working && now - working.updated < 60_000 ? working : undefined,
+      qsos,
     };
     for (const p of panels) {
       if (p.el.hidden) continue;

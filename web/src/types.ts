@@ -10,6 +10,8 @@ export interface Spot {
   dxg?: string;
   dxla?: number;
   dxlo?: number;
+  dxc?: string; // DX country (DXCC entity)
+  dxk?: string; // DX continent
   de: string;  // spotter
   deg?: string;
   dela?: number;
@@ -39,6 +41,36 @@ export interface ServerConfig {
   demo: boolean;
   nearKm: number;
   configured: boolean;
+  country?: string; // my DXCC entity
+  cont?: string;    // my continent
+  wavelog: boolean;
+}
+
+/** The station WSJT-X says you're working right now (call is "" between QSOs). */
+export interface Working {
+  call: string;
+  grid?: string;
+  lat?: number;
+  lon?: number;
+  f: number;
+  m: string;
+  report?: string;
+  txEnabled: boolean;
+  tx: boolean;
+  updated: number;
+}
+
+export interface QSO {
+  call: string;
+  t: number;
+  b?: string;
+  m?: string;
+  sent?: string;
+  rcvd?: string;
+  grid?: string;
+  name?: string;
+  country?: string;
+  src: "wavelog" | "wsjtx";
 }
 
 /** The station the operator is looking at (clicked on the map or a list). */
@@ -65,4 +97,6 @@ export interface UpdateContext {
   connected: boolean;
   dx?: DXSelection;
   select(sel: DXSelection | undefined): void;
+  working?: Working; // only while WSJT-X is running
+  qsos: QSO[];
 }

@@ -41,6 +41,16 @@ type Config struct {
 		Listen  string `json:"listen"`
 	} `json:"wsjtx"`
 
+	// Wavelog shows your latest QSOs. APIKey: a Wavelog 3.1+ token ("wl2_...")
+	// or a classic read-only API key (then StationID is required too).
+	Wavelog struct {
+		Enabled         bool   `json:"enabled"`
+		URL             string `json:"url"`
+		APIKey          string `json:"apiKey"`
+		StationID       string `json:"stationId"`
+		IntervalSeconds int    `json:"intervalSeconds"`
+	} `json:"wavelog"`
+
 	// NearKm: RBN/cluster spots only show if the spotter is this close to your QTH,
 	// so the DX list is stations you can likely hear and work from home.
 	NearKm float64 `json:"nearKm"`
@@ -75,11 +85,12 @@ func defaultConfig() Config {
 		"pskr/filter/v2/+/+/+/{CALL}/#", // who I hear (as reported by my own software)
 	}
 	c.RBN.Enabled = true
-	c.RBN.Addrs = []string{"telnet.reversebeacon.net:7000"}
+	c.RBN.Addrs = []string{"telnet.reversebeacon.net:7000", "telnet.reversebeacon.net:7001"} // CW/RTTY, FT8/FT4
 	c.Cluster.Addr = "dxc.nc7j.com:7373"
 	c.WSJTX.Enabled = true
 	c.WSJTX.Listen = "127.0.0.1:2237"
 	c.NearKm = 1500
+	c.Wavelog.IntervalSeconds = 60
 	c.Solar.Enabled = true
 	c.Solar.IntervalMinutes = 10
 	c.CTY.URL = "https://www.country-files.com/cty/cty.dat"

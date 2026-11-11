@@ -40,7 +40,8 @@ export class TopBar {
         this.status.innerHTML = `
       <span class="dot ${ctx.connected ? "ok" : "bad"}"></span>
       <span>${ctx.connected ? "Live" : "Reconnecting…"}</span>
-      <span class="muted">${count(ctx, "me")} hear you · ${count(ctx, "here")} heard</span>`;
+      ${ctx.working?.tx ? '<span class="txbadge">TX</span>' : ""}
+      <span class="muted">${count(ctx, "me")} stations hear you</span>`;
     }
 }
 function renderSolar(s) {

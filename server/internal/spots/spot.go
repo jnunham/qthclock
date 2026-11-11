@@ -9,23 +9,25 @@ import "strings"
 // "DX" is always the station that was heard (transmitting); "DE" is the
 // station that heard it (the spotter / receiver / skimmer).
 type Spot struct {
-	ID      uint64   `json:"id"`
-	Source  string   `json:"src"` // pskr | rbn | cluster | demo
-	Time    int64    `json:"t"`   // unix milliseconds
-	FreqKHz float64  `json:"f"`   // kHz
-	Band    string   `json:"b"`   // "20m" etc, "" if out of band
-	Mode    string   `json:"m"`   // FT8, CW, SSB ...
-	DX      string   `json:"dx"`  // heard station
-	DXGrid  string   `json:"dxg,omitempty"`
-	DXLat   *float64 `json:"dxla,omitempty"`
-	DXLon   *float64 `json:"dxlo,omitempty"`
-	DE      string   `json:"de"` // spotter
-	DEGrid  string   `json:"deg,omitempty"`
-	DELat   *float64 `json:"dela,omitempty"`
-	DELon   *float64 `json:"delo,omitempty"`
-	SNR     *int     `json:"snr,omitempty"`
-	WPM     *int     `json:"wpm,omitempty"`
-	Comment string   `json:"c,omitempty"`
+	ID        uint64   `json:"id"`
+	Source    string   `json:"src"` // pskr | rbn | cluster | demo
+	Time      int64    `json:"t"`   // unix milliseconds
+	FreqKHz   float64  `json:"f"`   // kHz
+	Band      string   `json:"b"`   // "20m" etc, "" if out of band
+	Mode      string   `json:"m"`   // FT8, CW, SSB ...
+	DX        string   `json:"dx"`  // heard station
+	DXGrid    string   `json:"dxg,omitempty"`
+	DXLat     *float64 `json:"dxla,omitempty"`
+	DXLon     *float64 `json:"dxlo,omitempty"`
+	DXCountry string   `json:"dxc,omitempty"` // DXCC entity name, from cty.dat
+	DXCont    string   `json:"dxk,omitempty"` // continent: NA, SA, EU, AF, AS, OC
+	DE        string   `json:"de"`            // spotter
+	DEGrid    string   `json:"deg,omitempty"`
+	DELat     *float64 `json:"dela,omitempty"`
+	DELon     *float64 `json:"delo,omitempty"`
+	SNR       *int     `json:"snr,omitempty"`
+	WPM       *int     `json:"wpm,omitempty"`
+	Comment   string   `json:"c,omitempty"`
 
 	// Rel says how the spot relates to the operator:
 	//   "me"   - someone heard me (DX is my call)

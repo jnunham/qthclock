@@ -2,9 +2,10 @@
 
 A shack display built around **your station**. It combines HamClock's at-a-glance operating info with DXLook-style live signal reports, but only shows what matters to you:
 
-- **My signal:** who is hearing you right now, on which bands, how far, and how loud (PSK Reporter + RBN).
-- **Heard here:** what your own receiver is decoding, fed live from WSJT-X / JTDX.
-- **DX near you:** cluster and RBN spots heard by skimmers close to your QTH, so these are stations you can very likely work.
+- **My signal:** who is hearing you right now on each band, the **average signal report** you're getting (each station's latest report, averaged per mode), and the farthest station (PSK Reporter + RBN).
+- **DX near you:** cluster and RBN spots heard by skimmers close to your QTH, so these are stations you can very likely work. Filter by the modes and bands you're working; your own country is hidden by default (optionally your whole continent).
+- **QSOs:** who you're working right now (live from WSJT-X, with TX/RX) and your latest QSOs from **Wavelog** and/or WSJT-X. Starting a QSO makes that station the DX automatically.
+- **Heard here** (off by default): what your own receiver is decoding, fed live from WSJT-X / JTDX.
 - **DE / DX:** your location and the selected station's: local time, sunrise and sunset, short- and long-path bearing and distance. Click any station on the map or in a list to make it the DX.
 - **Map** centered on you, with gray line and paths: solid lines for stations hearing you, dashed for stations you hear, rings for DX near you. Colour = band.
 - **Solar:** SFI, Kp and X-ray class from NOAA.
@@ -47,9 +48,27 @@ Install Go 1.22+ from https://go.dev/dl/, then run `make run` (or, without make:
 
 Press **s**, or click the gear, for layout, text size, theme and filters. Kiosk example: `http://pi:8073/?preset=wall&scale=1.6&theme=night`.
 
+### Wavelog
+
+To show your latest QSOs from Wavelog, edit the `wavelog` section of `config.json` and restart:
+
+```json
+"wavelog": {
+  "enabled": true,
+  "url": "https://log.example.com",
+  "apiKey": "wl2_...",
+  "stationId": "1"
+}
+```
+
+- **Wavelog 3.1 or newer:** create an API v2 token with `qso:read` scope (it starts with `wl2_`). `stationId` isn't needed.
+- **Older Wavelog:** use a read-only API key from the API keys page in Wavelog's menu, plus your station location ID (the small number badge on the Station Locations page).
+
+`url` is your Wavelog address, with or without `/index.php`. QTHClock checks for new QSOs every minute. QSOs logged in WSJT-X appear immediately and are merged with the Wavelog entry when it arrives.
+
 ### WSJT-X / JTDX
 
-In WSJT-X, open **Settings › Reporting** and set **UDP Server** to `127.0.0.1`, port `2237`, with "Accept UDP requests" ticked. If QTHClock runs on another machine, set the UDP server to that machine's IP, and set `"wsjtx": {"listen": ":2237"}` in `config.json`. Only one program can own the port, so if you already use GridTracker or a logger on 2237, have WSJT-X send to a secondary port or use multicast (planned).
+In WSJT-X, open **Settings › Reporting** and set **UDP Server** to `127.0.0.1`, port `2237`, with "Accept UDP requests" ticked. This gives QTHClock who you're working, TX/RX state, the QSOs you log and (if enabled) what you decode. If QTHClock runs on another machine, set the UDP server to that machine's IP, and set `"wsjtx": {"listen": ":2237"}` in `config.json`. Only one program can own the port, so if you already use GridTracker or a logger on 2237, have WSJT-X send to a secondary port or use multicast (planned).
 
 ## Config highlights
 
@@ -58,7 +77,8 @@ In WSJT-X, open **Settings › Reporting** and set **UDP Server** to `127.0.0.1`
 | `callsign`, `grid` | Your station (asked for on first launch). Needed for "who hears me", distances and "near me". |
 | `nearKm` | A cluster/RBN spot is "near you" if its spotter is within this distance (default 1500 km). |
 | `pskreporter.topics` | MQTT topics; `{CALL}` becomes your callsign. Defaults: who hears you, and who you hear. |
-| `rbn.addrs` | `telnet.reversebeacon.net:7000` (CW/RTTY), add `:7001` for FT8/FT4 skimmers. |
+| `rbn.addrs` | `telnet.reversebeacon.net:7000` is CW/RTTY skimmers, `:7001` is FT8/FT4. Both are on by default; drop one if you never use those modes. |
+| `wavelog` | Your Wavelog logbook (see above). |
 | `cluster` | Any DXSpider/AR-Cluster telnet node. |
 | `wsjtx.listen` | UDP address for WSJT-X decodes. |
 
@@ -91,6 +111,8 @@ In WSJT-X, open **Settings › Reporting** and set **UDP Server** to `127.0.0.1`
 | `web/src/panels/dedx.ts` | DE / DX box |
 | `web/src/panels/bandsummary.ts` | My signal / Heard here |
 | `web/src/panels/dxspots.ts` | DX near you |
+| `web/src/panels/qsos.ts` | Now working + recent QSOs |
+| `server/internal/logbook` | Recent QSOs, Wavelog client, ADIF parser |
 | `web/src/panels/map.ts` | MapLibre map with canvas fallback |
 | `web/src/astro.ts` | Sun times, bearings, distances |
 
@@ -100,7 +122,7 @@ To add a panel: write a class with `el` and `update(ctx)`, add it to `sideItems`
 
 - Azimuthal (great-circle) map centered on your QTH
 - Band predictions (VOACAP) from your QTH to the selected DX and to each continent
-- Log integration (ADIF / Club Log) to flag needed countries and bands in "DX near you"
+- Flag new countries / band-slots in "DX near you" using Wavelog's lookup API
 - Rig control (flrig / Hamlib): click a spot to tune
 - Rotator control from the DX bearing
 - Satellite passes, NCDXF beacons, contest and DXpedition calendars

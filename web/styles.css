@@ -112,7 +112,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; ov
 
 /* My signal / Heard here */
 .summary .rows { display: flex; flex-direction: column; gap: 0.05rem; overflow: hidden; }
-.srow { display: grid; grid-template-columns: 3.4rem 1fr 2rem 9.5rem 2.2rem; align-items: center; gap: 0.5rem; font-size: 0.82rem; line-height: 1.25; cursor: pointer; border-radius: 0.3rem; padding: 0 0.2rem; }
+.srow { display: grid; grid-template-columns: 3.4rem 1fr 2rem 7.6rem 9rem; align-items: center; gap: 0.5rem; font-size: 0.82rem; line-height: 1.25; cursor: pointer; border-radius: 0.3rem; padding: 0 0.2rem; }
 .srow:hover { background: var(--panel-2); }
 .srow .track { height: 0.5rem; background: var(--panel-2); border-radius: 0.3rem; overflow: hidden; }
 .srow .fill { display: block; height: 100%; border-radius: 0.3rem; transition: width 0.6s ease; }
@@ -199,3 +199,41 @@ body.idle, body.idle * { cursor: none; }
 .setup-card .actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 .setup-card .error { color: var(--poor); }
 #drawer .station { width: 100%; margin-top: 0.6rem; background: var(--panel-2); border: 1px solid var(--line); border-radius: 0.4rem; padding: 0.4rem; }
+
+/* My signal: header row + average report colouring */
+.srow.head { cursor: default; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.srow.head:hover { background: none; }
+.srow.head span:nth-child(2) { grid-column: span 2; }
+.srow .avg { white-space: nowrap; }
+.snr { font-weight: 600; font-variant-numeric: tabular-nums; }
+.snr.good { color: var(--good); }
+.snr.fair { color: var(--fair); }
+.snr.poor { color: var(--poor); }
+.snr .muted { font-weight: 400; font-size: 0.8em; }
+
+/* DX near you: filter summary button */
+.dxspots h2 .filters { float: right; font: inherit; text-transform: none; letter-spacing: 0; font-weight: 400;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 1rem;
+  padding: 0.05rem 0.6rem; cursor: pointer; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dxspots h2 .filters:hover { border-color: var(--accent); }
+
+/* QSOs */
+#body[data-side="right"] #side > .qsos { flex: 0 0 auto; }
+.qsos h2 .src { float: right; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.working { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 0.5rem; border-radius: 0.4rem;
+  background: var(--panel-2); margin-bottom: 0.35rem; font-size: 0.95rem; }
+.working .call { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.03em; }
+.working .spacer { flex: 1; }
+.working .badge { font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 0.3rem; background: var(--line); color: var(--muted); }
+.working.tx { outline: 1px solid var(--poor); }
+.working.tx .badge, .txbadge { background: var(--poor); color: #fff; }
+.txbadge { font-size: 0.75rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 0.3rem; animation: pulse 1s ease-in-out infinite alternate; }
+@keyframes pulse { to { opacity: 0.55; } }
+.qsos table { width: 100%; border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+.qsos td { padding: 0.12rem 0.3rem; white-space: nowrap; }
+.qsos tr + tr td { border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent); }
+.qsos .call { font-weight: 600; }
+.qsos .num { text-align: right; }
+.qsos .name { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; }
+.workbadge { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--poor); font-size: 0.75rem; margin-left: auto; margin-right: 0.5rem; }
+#drawer .station b { font-weight: 700; }

@@ -54,7 +54,7 @@ QTHClock is built to run on a screen nobody touches:
 
 - **It follows you on the air.** The top bar shows the band and mode you're being spotted on (from PSK Reporter / RBN reports of your call over the last 10 minutes). The map fades the other bands, and "My signal" and "Bands open" highlight your band. To turn this off, untick Settings › On air › Follow my spots.
 - **The DX box shows your last QSO** from Wavelog (for 2 hours). A station you click on the map or in a list stays selected for 3 minutes. The farthest station hearing you is listed under "My signal".
-- **The map always spans the full width of its panel**, showing all longitudes once on any screen shape (including 34" ultrawides). On wide, short panels it shows roughly 70°N to 40°S; taller panels show more, up to pole to pole. Zoom with the **+ / − / ⌂** buttons on the map (they hide when the mouse is idle) or from **Settings › Map zoom** on your phone; zooming centres on your QTH by default. Lines and dots get thicker on bigger screens. The coastlines and borders (Natural Earth, public domain) are downloaded once to `data/world.json` on first start.
+- **The map always spans the full width of its panel**, showing all longitudes once on any screen shape (including 34" ultrawides). On wide, short panels it shows roughly 70°N to 40°S; taller panels show more, up to pole to pole. Zoom with the **+ / − / ⌂** buttons on the map (they hide when the mouse is idle) or from **Settings › Map zoom** on your phone; zooming centres on your QTH by default. Lines and dots get thicker on bigger screens. The map is drawn from Natural Earth 1:50m (public domain): land, lakes (so the Great Lakes and Michigan show properly), country borders, and state/province lines for the US, Canada, Australia and Brazil. The layers are downloaded once on first start (about 4 MB, from Natural Earth's GitHub) and packed into `data/basemap.json`. No internet on the Pi? Copy `ne_50m_land`, `ne_50m_lakes`, `ne_50m_admin_0_boundary_lines_land` and `ne_50m_admin_1_states_provinces_lines` (`.geojson`) into a folder and start QTHClock with `QTHCLOCK_NATURAL_EARTH=/that/folder`.
 - **It's calm.** The clock ticks every second; the map and panels redraw every 5 seconds, and "Bands open" once a minute. Nothing flashes.
 - **Themes:** Dark, Ocean, Slate, Amber, Phosphor, Night (red) and Light. Each restyles the map too.
 - **Distances** are in miles by default; switch to kilometres in Settings › Distances.
@@ -120,7 +120,7 @@ QTHClock is one server shared by every screen you open; browsers never contact o
 | NOAA SWPC | Small JSON/text files with conditional requests (ETag / If-Modified-Since, so unchanged files cost a 304 with no body) and an identifying User-Agent | Solar flux hourly; Kp 3-hour table every 30 min; Kp now, X-ray and hemispheric power every 10 min; aurora image every 15 min. Errors back off up to an hour |
 | Wavelog (your server) | v2: newest 10 QSOs; classic key: full export once, then only new QSOs | Every minute; errors back off up to 10 min |
 | country-files.com (cty.dat) | One download | Weekly |
-| Natural Earth via jsDelivr (map outline) | One download | Once |
+| Natural Earth on GitHub (map layers) | Four files, one time | Once |
 
 ## Config highlights
 
@@ -165,7 +165,7 @@ QTHClock is one server shared by every screen you open; browsers never contact o
 | `web/src/layout.ts` | Chooses the screen layout |
 | `web/src/panels/qsos.ts` | Recent QSOs |
 | `server/internal/logbook` | Recent QSOs, Wavelog client, ADIF parser |
-| `web/src/panels/map.ts`, `web/src/world.ts` | The world map (canvas, equirectangular) and its outline loader |
+| `web/src/panels/map.ts`, `web/src/world.ts`, `server/internal/geo/basemap.go` | The world map (canvas, equirectangular), its layer loader, and the Natural Earth download/packing |
 | `web/src/astro.ts` | Sun times, bearings, distances |
 
 To add a panel: write a class with `el` and `update(ctx)`, add it to `sideItems` in `main.ts`, and add a `show` flag in `settings.ts` plus a checkbox in `drawer.ts`.

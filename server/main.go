@@ -72,19 +72,15 @@ func main() {
 		}
 	}
 
-	// World outline for the map (Natural Earth via world-atlas, public domain).
-	// Downloaded once to data/world.json; the map shows a plain grid until then.
-	worldPath := filepath.Join(cfg.DataDir, "world.json")
+	// Map outlines (Natural Earth 1:50m, public domain): built once into
+	// data/basemap.json. The map shows a plain grid until it's ready.
+	worldPath := filepath.Join(cfg.DataDir, "basemap.json")
 	go func() {
-		if _, err := os.Stat(worldPath); err == nil || cfg.WorldURL == "" {
-			return
-		}
-		if err := geo.Download(worldPath, cfg.WorldURL); err != nil {
-			log.Printf("map: couldn't download world outline (%v); showing a grid map", err)
-		} else {
-			log.Printf("map: downloaded world outline")
+		if err := geo.EnsureBasemap(worldPath); err != nil {
+			log.Printf("map: couldn't download the map outlines (%v); showing a grid map", err)
 		}
 	}()
+
 	st := &station{cfg: cfg, path: *cfgPath, fileDemo: fileDemo, hub: hub, recent: recent, loc: sources.Locator{CTY: cty}, parent: ctx}
 	st.start()
 

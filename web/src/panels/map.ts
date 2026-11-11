@@ -117,36 +117,59 @@ export class WorldMap implements Panel {
     c.fillStyle = v("--map-sea", "#0b1622");
     c.fillRect(Math.max(0, P.left), Math.max(0, P.Y(90)), Math.min(w, P.right) - Math.max(0, P.left), Math.min(h, P.Y(-90)) - Math.max(0, P.Y(90)));
 
-    // Each shape is drawn three times (shifted ±360°) so anything that
-    // crosses the edge of the view when centred on your QTH still shows.
-    const shifts = P.cLon === 0 ? [0] : [-360, 0, 360];
-    const trace = (ring: [number, number][], shift: number) => {
-      ring.forEach(([lo, la], i) => (i ? c.lineTo(P.X(lo + shift), P.Y(la)) : c.moveTo(P.X(lo + shift), P.Y(la))));
-      c.closePath();
-    };
-    if (this.world) {
-      c.fillStyle = v("--map-land", "#1b2a3a");
-      for (const shift of shifts) {
-        c.beginPath();
-        for (const poly of this.world.land) for (const ring of poly) trace(ring, shift);
-        c.fill("evenodd");
-      }
-      c.strokeStyle = v("--map-border", "rgba(255,255,255,0.18)");
-      c.lineWidth = Math.max(0.5, Math.min(1.4, P.k / 7));
-      c.lineJoin = "round";
-      for (const shift of shifts) {
-        c.beginPath();
-        for (const ring of this.world.borders) trace(ring, shift);
-        c.stroke();
-      }
-    }
-    // Graticule every 30°.
+    // Graticule every 30°, under the land.
     c.strokeStyle = v("--map-grid", "rgba(255,255,255,0.05)");
     c.lineWidth = 1;
     c.beginPath();
     for (let lon = -180; lon < 180; lon += 30) { c.moveTo(P.Xw(lon), P.Y(90)); c.lineTo(P.Xw(lon), P.Y(-90)); }
     for (let lat = -60; lat <= 60; lat += 30) { c.moveTo(0, P.Y(lat)); c.lineTo(w, P.Y(lat)); }
     c.stroke();
+
+    const world = this.world;
+    if (!world) return;
+    // Each shape is drawn shifted by ±360° too when the view is centred off
+    // Greenwich, so nothing is cut at the edge of the map.
+    const shifts = P.cLon === 0 ? [0] : [-360, 0, 360];
+    const trace = (pts: Float32Array, shift: number, close: boolean) => {
+      c.moveTo(P.X(pts[0] + shift), P.Y(pts[1]));
+      for (let i = 2; i < pts.length; i += 2) c.lineTo(P.X(pts[i] + shift), P.Y(pts[i + 1]));
+      if (close) c.closePath();
+    };
+    const fillPolys = (polys: Float32Array[][], color: string) => {
+      c.fillStyle = color;
+      for (const shift of shifts) {
+        c.beginPath();
+        for (const poly of polys) for (const ring of poly) trace(ring, shift, true);
+        c.fill("evenodd");
+      }
+    };
+    const strokePolys = (polys: Float32Array[][], color: string, width: number) => {
+      c.strokeStyle = color; c.lineWidth = width;
+      for (const shift of shifts) {
+        c.beginPath();
+        for (const poly of polys) for (const ring of poly) trace(ring, shift, true);
+        c.stroke();
+      }
+    };
+    const strokeLines = (lines: Float32Array[], color: string, width: number) => {
+      c.strokeStyle = color; c.lineWidth = width;
+      for (const shift of shifts) {
+        c.beginPath();
+        for (const l of lines) trace(l, shift, false);
+        c.stroke();
+      }
+    };
+    c.lineJoin = "round";
+    c.lineCap = "round";
+    // Line weights grow gently with zoom so detail stays crisp.
+    const lw = Math.max(0.6, Math.min(1.6, 0.55 + P.k / 12));
+
+    fillPolys(world.land, v("--map-land", "#1f3247"));
+    fillPolys(world.lakes, v("--map-sea", "#0b1826"));
+    strokeLines(world.states, v("--map-state", "rgba(150,190,230,0.16)"), lw * 0.6);
+    strokeLines(world.borders, v("--map-border", "rgba(150,190,230,0.32)"), lw * 0.85);
+    strokePolys(world.lakes, v("--map-coast", "rgba(150,190,230,0.45)"), lw * 0.7);
+    strokePolys(world.land, v("--map-coast", "rgba(150,190,230,0.45)"), lw);
   }
 
   update(ctx: UpdateContext): void {

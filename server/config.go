@@ -13,10 +13,6 @@ type Config struct {
 	WebDir   string `json:"webDir"`
 	DataDir  string `json:"dataDir"`
 
-	// WorldURL is where the map's coastlines and borders (Natural Earth,
-	// public domain) are downloaded from on first start.
-	WorldURL string `json:"worldUrl"`
-
 	HistoryMinutes int `json:"historyMinutes"`
 	HistoryMax     int `json:"historyMax"`
 
@@ -71,7 +67,6 @@ func defaultConfig() Config {
 	c.Listen = ":8073"
 	c.WebDir = "web"
 	c.DataDir = "data"
-	c.WorldURL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"
 	c.HistoryMinutes = 30
 	c.HistoryMax = 20000
 	c.PSKReporter.Enabled = true

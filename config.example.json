@@ -42,6 +42,5 @@
   "demo": {
     "enabled": false,
     "rate": 4
-  },
-  "worldUrl": "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"
+  }
 }

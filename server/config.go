@@ -49,6 +49,7 @@ type Config struct {
 		APIKey          string `json:"apiKey"`
 		StationID       string `json:"stationId"`
 		IntervalSeconds int    `json:"intervalSeconds"`
+		SkipTLSVerify   bool   `json:"skipTLSVerify"` // for a self-signed certificate
 	} `json:"wavelog"`
 
 	// NearKm: RBN/cluster spots only show if the spotter is this close to your QTH,
@@ -88,7 +89,7 @@ func defaultConfig() Config {
 	c.RBN.Addrs = []string{"telnet.reversebeacon.net:7000", "telnet.reversebeacon.net:7001"} // CW/RTTY, FT8/FT4
 	c.Cluster.Addr = "dxc.nc7j.com:7373"
 	c.WSJTX.Enabled = true
-	c.WSJTX.Listen = "127.0.0.1:2237"
+	c.WSJTX.Listen = "0.0.0.0:2237" // any interface, so WSJT-X on another PC can reach a Pi
 	c.NearKm = 1500
 	c.Wavelog.IntervalSeconds = 60
 	c.Solar.Enabled = true

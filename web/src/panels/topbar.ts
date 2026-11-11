@@ -13,8 +13,11 @@ export class TopBar implements Panel {
   private status: HTMLElement;
   private radio: HTMLElement;
 
+  private ips: string[];
+
   constructor(el: HTMLElement, cfg: ServerConfig, private settings: () => Settings) {
     this.el = el;
+    this.ips = cfg.ips ?? [];
     el.innerHTML = `
       <div class="ident">
         <div class="call">${cfg.callsign || "NOCALL"}</div>
@@ -50,8 +53,8 @@ export class TopBar implements Panel {
          <span class="rmode">${r.m}</span>
          <span class="rfreq muted">${(r.f / 1000).toFixed(3)} MHz</span>
          <span class="txrx ${r.tx ? "tx" : ""}">${r.tx ? "TX" : "RX"}</span>`
-      : `<span class="muted">Radio idle</span>`;
-    this.radio.title = r ? "Band and mode from WSJT-X" : "Waiting for WSJT-X (Settings › Reporting › UDP Server)";
+      : `<span class="idle"><span class="muted">Radio idle</span><span class="why">${idleReason(ctx, this.ips)}</span></span>`;
+    this.radio.title = r ? "Band and mode from WSJT-X" : "";
     this.solar.hidden = !s.show.solar;
     this.solar.innerHTML = renderSolar(ctx.solar);
 
@@ -82,4 +85,16 @@ function count(ctx: UpdateContext, rel: "me" | "here"): number {
   const calls = new Set<string>();
   for (const s of ctx.spots) if (s.rel === rel) calls.add(rel === "me" ? s.de : s.dx);
   return calls.size;
+}
+
+/** Explain why no radio is showing, so a wrong WSJT-X setting is obvious on the wall. */
+function idleReason(ctx: UpdateContext, ips: string[]): string {
+  const i = ctx.wsjtx;
+  const port = i?.listen.split(":").pop() || "2237";
+  const target = `${ips[0] ?? "this computer's IP"} port ${port}`;
+  if (!i) return "";
+  if (i.error) return `WSJT-X listener: ${i.error}`;
+  if (!i.packets) return `No WSJT-X data yet. In WSJT-X › Settings › Reporting set UDP Server to ${target}`;
+  if (i.lastAt && ctx.now - i.lastAt > 60_000) return `WSJT-X last heard ${Math.round((ctx.now - i.lastAt) / 60000)} min ago`;
+  return "WSJT-X connected, waiting for its status";
 }

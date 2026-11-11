@@ -33,6 +33,9 @@ type WSJTX struct {
 	// empty between QSOs). OnLogged is called when you log a QSO in WSJT-X.
 	OnStatus func(logbook.Working)
 	OnLogged func(logbook.QSO)
+	// OnListen reports the listener state for the on-screen diagnostics:
+	// the address, any bind error, and where the last packet came from.
+	OnListen func(info WSJTXInfo)
 
 	mu   sync.Mutex
 	last logbook.Working
@@ -44,26 +47,71 @@ const wsjtxMagic = 0xadbccbda
 
 var gridRe = regexp.MustCompile(`^[A-R]{2}[0-9]{2}$`)
 
+// WSJTXInfo is shown on screen when the radio looks idle, so a wrong UDP
+// setting is obvious without reading logs.
+type WSJTXInfo struct {
+	Listen   string `json:"listen"`
+	Error    string `json:"error,omitempty"`
+	LastFrom string `json:"lastFrom,omitempty"`
+	LastAt   int64  `json:"lastAt,omitempty"`
+	Packets  uint64 `json:"packets"`
+}
+
 func (w *WSJTX) Run(ctx context.Context) {
 	w.dial = map[string]uint64{}
 	w.mode = map[string]string{}
+	info := WSJTXInfo{Listen: w.Listen}
+	report := func() {
+		if w.OnListen != nil {
+			w.OnListen(info)
+		}
+	}
 	retry(ctx, "wsjtx", func(ctx context.Context) error {
 		addr, err := net.ResolveUDPAddr("udp", w.Listen)
 		if err != nil {
+			info.Error = err.Error()
+			report()
 			return err
 		}
-		conn, err := net.ListenUDP("udp", addr)
+		var conn *net.UDPConn
+		if addr.IP != nil && addr.IP.IsMulticast() {
+			// WSJT-X can send to a multicast group (e.g. 224.0.0.73 or 239.255.0.1)
+			// so several programs (GridTracker, loggers, QTHClock) all receive it.
+			conn, err = net.ListenMulticastUDP("udp", nil, addr)
+		} else {
+			conn, err = net.ListenUDP("udp", addr)
+		}
 		if err != nil {
+			info.Error = err.Error()
+			if strings.Contains(err.Error(), "address already in use") {
+				info.Error = "port already used by another program (GridTracker, JTAlert, a logger?). Use a multicast address in WSJT-X and here, or a different port"
+			}
+			report()
 			return err
 		}
 		defer conn.Close()
 		go func() { <-ctx.Done(); conn.Close() }()
 		log.Printf("wsjtx: listening on %s", w.Listen)
+		info.Error = ""
+		report()
 		buf := make([]byte, 65536)
+		var lastReport int64
 		for {
-			n, _, err := conn.ReadFromUDP(buf)
+			n, from, err := conn.ReadFromUDP(buf)
 			if err != nil {
 				return err
+			}
+			info.Packets++
+			info.LastAt = time.Now().UnixMilli()
+			if from != nil {
+				info.LastFrom = from.IP.String()
+			}
+			if info.Packets == 1 {
+				log.Printf("wsjtx: receiving from %s", info.LastFrom)
+			}
+			if info.LastAt-lastReport > 10000 {
+				lastReport = info.LastAt
+				report()
 			}
 			w.handle(buf[:n])
 		}
@@ -82,6 +130,9 @@ func (w *WSJTX) handle(b []byte) {
 		return
 	}
 	switch typ {
+	case 0: // Heartbeat: WSJT-X sends one every 15 s. Status messages only
+		// come when something changes, so this keeps "now on 20m FT8" alive.
+		w.alive()
 	case 1: // Status
 		dial := r.u64()
 		mode := r.str()
@@ -129,6 +180,7 @@ func (w *WSJTX) handle(b []byte) {
 				RSTSent: sent, RSTRcvd: rcvd, Grid: dxGrid, Name: name, Source: "wsjtx"})
 		}
 	case 2: // Decode
+		w.alive()
 		r.boolean() // new
 		r.u32()     // time, ms since midnight UTC
 		snr := int(int32(r.u32()))
@@ -157,6 +209,17 @@ func (w *WSJTX) handle(b []byte) {
 		}
 		w.Locator.Fill(&s)
 		w.Pub(s)
+	}
+}
+
+// alive re-sends the last known status (with a fresh timestamp) so the
+// display doesn't think the radio went idle while you sit on one band.
+func (w *WSJTX) alive() {
+	w.mu.Lock()
+	last := w.last
+	w.mu.Unlock()
+	if last.Updated != 0 && last.Mode != "" {
+		w.status(last)
 	}
 }
 

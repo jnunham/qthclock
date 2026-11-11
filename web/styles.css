@@ -248,3 +248,8 @@ body.idle, body.idle * { cursor: none; }
 .srow.cur { outline: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .autobadge { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--muted); font-size: 0.75rem; margin-left: auto; margin-right: 0.5rem; }
 #drawer h2 .small { font-weight: 400; margin-left: 0.4rem; }
+
+.radio .idle { display: flex; flex-direction: column; line-height: 1.25; max-width: 34rem; }
+.radio .why { font-size: 0.8rem; color: var(--fair); }
+.wlerror { color: var(--poor); font-size: 0.82rem; padding: 0.3rem 0; line-height: 1.35; }
+.summary .farthest { font-size: 0.9rem; margin: -0.1rem 0 0.3rem; }

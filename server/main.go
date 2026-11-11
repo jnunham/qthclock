@@ -27,11 +27,15 @@ import (
 func main() {
 	cfgPath := flag.String("config", "config.json", "path to config file")
 	demo := flag.Bool("demo", false, "generate fake spots instead of connecting to live feeds")
+	checkWL := flag.Bool("check-wavelog", false, "test the Wavelog connection once and exit")
 	flag.Parse()
 
 	cfg, err := loadConfig(*cfgPath)
 	if err != nil {
 		log.Fatalf("config: %v", err)
+	}
+	if *checkWL {
+		os.Exit(checkWavelog(cfg))
 	}
 	fileDemo := cfg.Demo.Enabled
 	if *demo {
@@ -77,7 +81,7 @@ func main() {
 	mux.HandleFunc("GET /api/config", func(w http.ResponseWriter, r *http.Request) {
 		c := st.config()
 		out := map[string]any{"callsign": c.Callsign, "grid": c.Grid, "mapStyle": c.MapStyle,
-			"demo": c.Demo.Enabled, "nearKm": c.NearKm, "configured": c.configured(), "boot": boot}
+			"demo": c.Demo.Enabled, "nearKm": c.NearKm, "configured": c.configured(), "boot": boot, "ips": lanIPs()}
 		if la, lo, ok := geo.GridToLatLon(c.Grid); ok {
 			out["lat"], out["lon"] = la, lo
 		}

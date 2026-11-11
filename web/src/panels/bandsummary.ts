@@ -23,6 +23,7 @@ export class BandSummary implements Panel {
     this.el.className = `panel summary ${rel}`;
     this.el.innerHTML = `
       <h2>${title} <span class="muted count"></span></h2>
+      <div class="farthest"></div>
       <div class="srow head muted"><span>Band</span><span>Stations</span><span class="n">Avg report</span><span>Farthest</span></div>
       <div class="rows"></div>`;
     this.body = this.el.querySelector(".rows")!;
@@ -52,6 +53,18 @@ export class BandSummary implements Panel {
       }
       per.set(s.b, b);
     }
+    // Farthest station overall (on the current band when following the radio).
+    const farEl = this.el.querySelector<HTMLElement>(".farthest")!;
+    let far: Spot | undefined;
+    for (const s of latest.values()) {
+      if (s.km == null || (ctx.active && s.b !== ctx.active.band)) continue;
+      if (!far || s.km > far.km!) far = s;
+    }
+    farEl.innerHTML = far
+      ? `<span class="muted">Farthest${ctx.active ? ` on ${far.b}` : ""}:</span> <b>${this.rel === "me" ? far.de : far.dx}</b>
+         ${km(far.km!)} <span class="muted">· ${far.b} ${far.m}${far.snr != null ? ` · ${far.snr > 0 ? "+" : ""}${far.snr} dB` : ""}${
+           far.dxc && this.rel === "here" ? ` · ${far.dxc}` : ""}</span>`
+      : "";
     const stations = new Set([...latest.values()].map((s) => (this.rel === "me" ? s.de : s.dx)));
     this.el.querySelector(".count")!.textContent = stations.size ? `${stations.size} stations` : "";
 

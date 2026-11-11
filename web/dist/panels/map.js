@@ -62,13 +62,36 @@ class LiveMap {
         this.map = new maplibregl.Map({
             container: el,
             style: cfg.mapStyle,
-            center: [cfg.lon ?? 0, 25],
-            zoom: 1.3,
-            minZoom: 0.5,
+            center: [0, 20],
+            zoom: 1,
+            renderWorldCopies: false, // one world, never repeated on a wide screen
             attributionControl: { compact: true },
         });
         this.map.on("load", () => this.onLoad());
-        new ResizeObserver(() => this.map.resize()).observe(el);
+        new ResizeObserver(() => {
+            this.map.resize();
+            this.fitWorld();
+        }).observe(el);
+    }
+    /**
+     * Zoom so the whole inhabited world (about 58°S to 78°N) fills the panel
+     * exactly once, whatever the screen shape, and don't allow zooming out
+     * further (which would only add empty space).
+     */
+    fitWorld() {
+        if (this.globe)
+            return;
+        const w = this.el.clientWidth, h = this.el.clientHeight;
+        if (!w || !h)
+            return;
+        const merc = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+        const top = merc(78), bottom = merc(-58);
+        const zoomW = Math.log2(w / 512);
+        const zoomH = Math.log2(h / ((512 * (top - bottom)) / (2 * Math.PI)));
+        const zoom = Math.min(zoomW, zoomH);
+        const midLat = (2 * Math.atan(Math.exp((top + bottom) / 2)) - Math.PI / 2) * (180 / Math.PI);
+        this.map.setMinZoom(zoom);
+        this.map.jumpTo({ center: [0, midLat], zoom });
     }
     onLoad() {
         const m = this.map;
@@ -110,6 +133,7 @@ class LiveMap {
         });
         m.on("mouseenter", "dots", () => (m.getCanvas().style.cursor = "pointer"));
         m.on("mouseleave", "dots", () => (m.getCanvas().style.cursor = ""));
+        this.fitWorld();
         this.ready = true;
     }
     update(ctx) {
@@ -123,6 +147,10 @@ class LiveMap {
                 this.map.setProjection({ type: s.globe ? "globe" : "mercator" });
             }
             catch { /* older MapLibre */ }
+            if (s.globe)
+                this.map.setMinZoom(0);
+            else
+                this.fitWorld();
         }
         const nightHidden = this.map.getLayoutProperty("night", "visibility") === "none";
         if (ctx.now - this.lastNight > 60_000 || nightHidden === s.show.grayline) {
@@ -130,12 +158,14 @@ class LiveMap {
             this.map.setLayoutProperty("night", "visibility", s.show.grayline ? "visible" : "none");
             this.map.getSource("night").setData(feature({ type: "Polygon", coordinates: [nightPolygon(new Date(ctx.now))] }, {}));
         }
-        const selKey = ctx.dx ? `${ctx.dx.call}|${ctx.dx.lat}|${ctx.dx.lon}` : "";
+        // Only draw a path to the station you're working or one you clicked.
+        const path = ctx.dx && ctx.dx.reason !== "last" ? ctx.dx : undefined;
+        const selKey = path ? `${path.call}|${path.lat}|${path.lon}` : "";
         if (selKey !== this.lastSel) {
             this.lastSel = selKey;
             const home = this.cfg;
-            this.map.getSource("selpath").setData(ctx.dx && home.lat != null && home.lon != null
-                ? feature({ type: "LineString", coordinates: greatCircle(home.lat, home.lon, ctx.dx.lat, ctx.dx.lon, 64) }, {})
+            this.map.getSource("selpath").setData(path && home.lat != null && home.lon != null
+                ? feature({ type: "LineString", coordinates: greatCircle(home.lat, home.lon, path.lat, path.lon, 64) }, {})
                 : { type: "FeatureCollection", features: [] });
         }
         if (ctx.now - this.lastDraw < REDRAW_MS)
@@ -259,7 +289,7 @@ class CanvasMap {
             path(l.coords);
         }
         c.setLineDash([]);
-        if (ctx.dx && home) {
+        if (ctx.dx && ctx.dx.reason !== "last" && home) {
             c.globalAlpha = 0.9;
             c.strokeStyle = "#fff";
             c.lineWidth = 3.5;

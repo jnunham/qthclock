@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -51,7 +52,7 @@ func TestWavelogV2AndV1(t *testing.T) {
 		case "/index.php/api/get_contacts_adif":
 			var req map[string]any
 			json.NewDecoder(r.Body).Decode(&req)
-			if req["key"] != "classic" || req["station_id"] != "2" {
+			if req["key"] != "classic" || req["station_id"] != float64(2) || req["fetchfromid"] != float64(0) {
 				w.WriteHeader(401)
 				return
 			}
@@ -68,7 +69,33 @@ func TestWavelogV2AndV1(t *testing.T) {
 		t.Fatalf("v2: %v %+v", err, got)
 	}
 	w = &Wavelog{URL: srv.URL + "/index.php", Key: "classic", StationID: "2", Add: func(q ...QSO) { got = q }, client: srv.Client()}
-	if err := w.pollV1(context.Background()); err != nil || len(got) != 2 || got[0].Call != "JA1YRL" || w.lastID != "4886" {
-		t.Fatalf("v1: %v %+v last=%s", err, got, w.lastID)
+	if err := w.pollV1(context.Background()); err != nil || len(got) != 2 || got[0].Call != "JA1YRL" || w.lastID != 4886 {
+		t.Fatalf("v1: %v %+v last=%d", err, got, w.lastID)
+	}
+}
+
+func TestWavelogErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/index.php/api/get_contacts_adif":
+			w.Write([]byte(`{"status":"failed","reason":"missing api key"}`))
+		case "/index.php/api/v2/qso":
+			w.WriteHeader(404)
+			w.Write([]byte("<html>not found</html>"))
+		}
+	}))
+	defer srv.Close()
+	var msg string
+	w := &Wavelog{URL: srv.URL, Key: "bad", StationID: "1", Add: func(...QSO) {}, Status: func(ok bool, m string) { msg = m }}
+	if err := w.Poll(context.Background()); err == nil || !strings.Contains(msg, "missing api key") {
+		t.Errorf("v1 failure not surfaced: %v", msg)
+	}
+	w = &Wavelog{URL: srv.URL, Key: "wl2_x", Add: func(...QSO) {}, Status: func(ok bool, m string) { msg = m }}
+	if err := w.Poll(context.Background()); err == nil || !strings.Contains(msg, "3.1") {
+		t.Errorf("v2 404 hint missing: %v", msg)
+	}
+	w = &Wavelog{URL: srv.URL, Key: "k", Add: func(...QSO) {}}
+	if err := w.Poll(context.Background()); err == nil || !strings.Contains(err.Error(), "stationId") {
+		t.Errorf("missing station id not reported: %v", err)
 	}
 }

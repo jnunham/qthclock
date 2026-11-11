@@ -129,7 +129,8 @@ func (s *station) start() {
 	}
 	if cfg.WSJTX.Enabled {
 		go (&sources.WSJTX{Listen: cfg.WSJTX.Listen, Call: cfg.Callsign, Grid: cfg.Grid, Pub: pub, Locator: loc,
-			OnStatus: working, OnLogged: func(q logbook.QSO) { recent.Add(q) }}).Run(ctx)
+			OnStatus: working, OnLogged: func(q logbook.QSO) { recent.Add(q) },
+			OnListen: func(i sources.WSJTXInfo) { hub.SetState("wsjtx", i) }}).Run(ctx)
 	}
 	if cfg.RBN.Enabled {
 		for _, a := range cfg.RBN.Addrs {
@@ -139,13 +140,17 @@ func (s *station) start() {
 	if cfg.Cluster.Enabled {
 		go (&sources.Telnet{Name: "cluster", Addr: cfg.Cluster.Addr, Call: cfg.Callsign, Pub: pub, Locator: loc}).Run(ctx)
 	}
-	if cfg.Wavelog.Enabled {
-		if cfg.Wavelog.URL == "" || cfg.Wavelog.APIKey == "" {
-			log.Printf("wavelog: set \"url\" and \"apiKey\" in config to show your recent QSOs")
-		} else {
-			go (&logbook.Wavelog{URL: cfg.Wavelog.URL, Key: cfg.Wavelog.APIKey, StationID: cfg.Wavelog.StationID,
-				Interval: time.Duration(cfg.Wavelog.IntervalSeconds) * time.Second, Add: recent.Add}).Run(ctx)
-		}
+	wlStatus := func(ok bool, msg string) {
+		hub.SetState("wavelog", map[string]any{"ok": ok, "error": msg, "at": time.Now().UnixMilli()})
+	}
+	switch {
+	case !cfg.Wavelog.Enabled:
+		wlStatus(false, "")
+	case cfg.Wavelog.URL == "" || cfg.Wavelog.APIKey == "":
+		log.Printf("wavelog: set \"url\" and \"apiKey\" in config to show your recent QSOs")
+		wlStatus(false, `Wavelog is enabled but "url" or "apiKey" is empty in config.json`)
+	default:
+		go newWavelog(cfg, recent.Add, wlStatus).Run(ctx)
 	}
 }
 
@@ -196,6 +201,19 @@ func promptStation(cfg *Config) error {
 	}
 }
 
+// lanIPs lists this machine's IPv4 addresses (for "point WSJT-X here" hints).
+func lanIPs() []string {
+	var out []string
+	if addrs, err := net.InterfaceAddrs(); err == nil {
+		for _, a := range addrs {
+			if ip, ok := a.(*net.IPNet); ok && ip.IP.To4() != nil && !ip.IP.IsLoopback() {
+				out = append(out, ip.IP.String())
+			}
+		}
+	}
+	return out
+}
+
 // printURLs shows where to open the display, including LAN addresses for a
 // Pi you're setting up from another computer.
 func printURLs(listen string, configured bool) {
@@ -229,4 +247,37 @@ func saveConfig(path string, cfg Config, fileDemo bool) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func newWavelog(cfg Config, add func(...logbook.QSO), status func(bool, string)) *logbook.Wavelog {
+	return &logbook.Wavelog{URL: cfg.Wavelog.URL, Key: cfg.Wavelog.APIKey, StationID: cfg.Wavelog.StationID,
+		Interval: time.Duration(cfg.Wavelog.IntervalSeconds) * time.Second, SkipTLSVerify: cfg.Wavelog.SkipTLSVerify,
+		Add: add, Status: status}
+}
+
+// checkWavelog runs one Wavelog fetch and prints the result (qthclock -check-wavelog).
+func checkWavelog(cfg Config) int {
+	if cfg.Wavelog.URL == "" || cfg.Wavelog.APIKey == "" {
+		fmt.Println(`Set "url" and "apiKey" in the "wavelog" section of config.json first.`)
+		return 1
+	}
+	kind := "classic API key (api/get_contacts_adif)"
+	if strings.HasPrefix(cfg.Wavelog.APIKey, "wl2_") {
+		kind = "API v2 token (api/v2/qso)"
+	}
+	fmt.Printf("Checking Wavelog at %s using a %s...\n", cfg.Wavelog.URL, kind)
+	var got []logbook.QSO
+	w := newWavelog(cfg, func(q ...logbook.QSO) { got = append(got, q...) }, nil)
+	if err := w.Poll(context.Background()); err != nil {
+		fmt.Println("FAILED:", err)
+		return 1
+	}
+	fmt.Printf("OK: %d recent QSOs\n", len(got))
+	for _, q := range got {
+		fmt.Printf("  %s  %-10s %-5s %-5s sent %-4s rcvd %s\n", time.UnixMilli(q.Time).UTC().Format("2006-01-02 15:04Z"), q.Call, q.Band, q.Mode, q.RSTSent, q.RSTRcvd)
+	}
+	if !cfg.Wavelog.Enabled {
+		fmt.Println(`Note: "enabled" is false in the wavelog section, so the display won't use it yet.`)
+	}
+	return 0
 }

@@ -114,6 +114,15 @@ func TestWSJTXStatusAndLogged(t *testing.T) {
 	if len(working) != 1 {
 		t.Fatalf("duplicate status published")
 	}
+	// A heartbeat 16 s later re-publishes the last status, so the display
+	// doesn't go "idle" while you sit on one band.
+	w.mu.Lock()
+	w.last.Updated -= 16000
+	w.mu.Unlock()
+	w.handle(header(0))
+	if len(working) != 2 || working[1].Call != "JA1YRL" || working[1].Band != "20m" {
+		t.Fatalf("heartbeat didn't refresh status: %+v", working)
+	}
 
 	dt := func(b []byte, unixMs int64) []byte {
 		jd := unixMs/86400000 + 2440588

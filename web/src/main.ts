@@ -1,4 +1,4 @@
-import type { DXSelection, Panel, QSO, ServerConfig, Solar, Spot, UpdateContext, Working } from "./types.js";
+import type { DXSelection, Panel, QSO, ServerConfig, Solar, UpdateContext, Working, WSJTXInfo } from "./types.js";
 import { fetchSettings, mergeSettings, saveSettings, urlOverrides, PRESETS, type Settings } from "./settings.js";
 import { SpotStore } from "./store.js";
 import { connectStream } from "./stream.js";
@@ -11,10 +11,8 @@ import { DXSpots } from "./panels/dxspots.js";
 import { showSetup } from "./setup.js";
 import { QSOPanel } from "./panels/qsos.js";
 
-/** A station you click stays the DX this long before automatic selection resumes. */
+/** A station you click stays the DX this long, then the display goes back to your QSO partner. */
 const MANUAL_HOLD_MS = 3 * 60_000;
-/** Automatic DX is re-evaluated at most this often, so it doesn't flicker. */
-const AUTO_DX_MS = 30_000;
 
 async function main() {
   const cfg: ServerConfig = await fetch("api/config").then((r) => r.json());
@@ -34,11 +32,13 @@ async function main() {
   let connected = false;
   let working: Working | undefined;
   let qsos: QSO[] = [];
+  let wavelog: UpdateContext["wavelog"];
+  let wsjtx: WSJTXInfo | undefined;
 
-  // DX selection: working station > recent click > automatic pick.
+  // DX selection: the station you're working > a recent click > your last QSO partner.
   let manual: { sel: DXSelection; at: number } | undefined;
-  let auto: { sel?: DXSelection; at: number; band?: string } = { at: 0 };
   let workingSel: DXSelection | undefined;
+  let lastSel: DXSelection | undefined;
 
   const topbar = new TopBar(document.getElementById("topbar")!, cfg, get);
   const map = createMap(document.getElementById("map")!, cfg, get);
@@ -97,12 +97,23 @@ async function main() {
         workingSel = { call: w.call, lat: w.lat, lon: w.lon, grid: w.grid, reason: "working" };
         manual = undefined; // a new QSO takes over from whatever was clicked
       }
-      if (!w.call) workingSel = undefined;
+      w.updated = Date.now(); // use this screen's clock, in case the Pi's and this device's clocks differ
+      if (!w.call && workingSel) {
+        lastSel = { ...workingSel, reason: "last" };
+        workingSel = undefined;
+      }
       working = w;
       tick(true);
     },
     qsos: (q) => {
       qsos = q;
+      tick(true);
+    },
+    wsjtx: (i) => {
+      wsjtx = i;
+    },
+    wavelog: (w) => {
+      wavelog = w;
       tick(true);
     },
     settings: (s) => {
@@ -122,19 +133,8 @@ async function main() {
 
   const select = (sel: DXSelection | undefined) => {
     manual = sel ? { sel: { ...sel, reason: "manual" }, at: Date.now() } : undefined;
-    if (!sel) auto = { at: 0 };
+    if (!sel) lastSel = undefined;
     tick(true);
-  };
-
-  /** Farthest station hearing me, on the active band when following the radio. */
-  const pickAuto = (spots: Spot[], band?: string): DXSelection | undefined => {
-    let best: Spot | undefined;
-    for (const s of spots) {
-      if (s.rel !== "me" || s.dela == null || s.delo == null || s.km == null) continue;
-      if (band && s.b !== band) continue;
-      if (!best || s.km > best.km!) best = s;
-    }
-    return best ? { call: best.de, lat: best.dela!, lon: best.delo!, grid: best.deg, spot: best, reason: "auto" } : undefined;
   };
 
   const panels: Panel[] = [topbar, map, ...sideItems.map(([p]) => p)];
@@ -151,15 +151,12 @@ async function main() {
     const spots = store.filtered(settings, now, cfg, active);
 
     if (manual && now - manual.at > MANUAL_HOLD_MS) manual = undefined;
-    if (now - auto.at > AUTO_DX_MS || auto.band !== active?.band) {
-      auto = { sel: pickAuto(spots, active?.band), at: now, band: active?.band };
-    }
-    const dx = (radio && workingSel) || manual?.sel || auto.sel;
+    const dx = (radio && workingSel) || manual?.sel || lastSel;
 
     const ctx: UpdateContext = {
       now, spots, allCount: store.size, ratePerMin: store.ratePerMin,
       solar, connected, dx, select,
-      working: radio, qsos, active,
+      working: radio, qsos, active, wavelog, wsjtx,
     };
     for (const p of panels) {
       if (p.el.hidden) continue;

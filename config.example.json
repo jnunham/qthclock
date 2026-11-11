@@ -18,7 +18,7 @@
   },
   "wsjtx": {
     "enabled": true,
-    "listen": "127.0.0.1:2237"
+    "listen": "0.0.0.0:2237"
   },
   "nearKm": 1500,
   "wavelog": {

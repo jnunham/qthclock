@@ -37,9 +37,11 @@ export class QSOPanel {
         else {
             this.now.innerHTML = "";
         }
+        const wl = ctx.wavelog;
+        const wlError = wl && !wl.ok && wl.error ? `<div class="wlerror" title="Run ./qthclock -check-wavelog on the Pi for details">Wavelog: ${esc(wl.error)}</div>` : "";
         if (!ctx.qsos.length) {
-            this.list.innerHTML = `<div class="muted hint">${this.cfg.wavelog
-                ? "Waiting for Wavelog…"
+            this.list.innerHTML = wlError + `<div class="muted hint">${this.cfg.wavelog
+                ? wl?.ok ? "No QSOs in Wavelog yet." : wlError ? "" : "Connecting to Wavelog…"
                 : "QSOs you log in WSJT-X show here. Add your Wavelog URL and API key in config.json to show your logbook."}</div>`;
             return;
         }
@@ -52,7 +54,10 @@ export class QSOPanel {
         <td class="num muted">${q.sent ?? ""}</td>
         <td class="num">${q.rcvd ?? ""}</td>
         <td class="muted name">${q.name || q.country || ""}</td>
-      </tr>`).join("")}</tbody></table>`;
+      </tr>`).join("")}</tbody></table>` + wlError;
     }
+}
+function esc(s) {
+    return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 }
 //# sourceMappingURL=qsos.js.map

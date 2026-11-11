@@ -7,7 +7,7 @@ A shack display built around **your station**. It combines HamClock's at-a-glanc
 - **QSOs:** who you're working right now (live from WSJT-X, with TX/RX) and your latest QSOs from **Wavelog** and/or WSJT-X. Starting a QSO makes that station the DX automatically.
 - **Heard here** (off by default): what your own receiver is decoding, fed live from WSJT-X / JTDX.
 - **DE / DX:** your location and the selected station's: local time, sunrise and sunset, short- and long-path bearing and distance. Click any station on the map or in a list to make it the DX.
-- **Map** centered on you, with gray line and paths: solid lines for stations hearing you, dashed for stations you hear, rings for DX near you. Colour = band.
+- **Map** of the whole world with the gray line. Lines and dots run from you to each **station hearing you** (dot = where that station is); hollow rings are **DX spotted near you** that you could work; the white line is the station you're **working now**. Colour = band.
 - **Solar:** SFI, Kp and X-ray class from NOAA.
 
 ![QTHClock in demo mode](docs/screenshot.png)
@@ -53,7 +53,8 @@ Press **s**, or click the gear, for layout, text size, theme and filters. Kiosk 
 QTHClock is built to run on a screen nobody touches:
 
 - **It follows the radio.** WSJT-X sends QTHClock your dial frequency and mode, and the top bar shows your current band, mode, frequency and TX/RX. While WSJT-X is running, "DX near you" shows only your current band and mode, the map fades the other bands, and "My signal" highlights your band. When WSJT-X is closed, the DX list goes back to your saved filters. To turn this off, untick Settings › Radio › Follow WSJT-X.
-- **It picks the DX for you.** The DX box shows the station you're working. Between QSOs it shows the farthest station hearing you on your current band, re-checked every 30 seconds. If you click a station, it stays selected for 3 minutes, then automatic selection resumes.
+- **The DX box follows your QSOs.** It shows the station you're working, with a path drawn on the map; after the QSO it keeps that station (marked "last QSO", no path) until your next one. A station you click stays selected for 3 minutes. The farthest station hearing you is listed under "My signal".
+- **The map shows the world once**, sized to fill the panel on any screen shape (including 34" ultrawides), instead of repeating side by side.
 - **You control it from any other device.** Open `http://<pi-address>:8073` on your phone or laptop and change settings there; the monitor updates instantly. Settings are stored on the server (`data/display.json`), not in one browser.
 - **It updates itself.** After a `git pull` and restart, open screens reload the new version automatically.
 - **Per-screen tweaks** go in the URL and only affect that screen, e.g. `http://localhost:8073/?scale=1.3&preset=balanced`.
@@ -94,11 +95,25 @@ To show your latest QSOs from Wavelog, edit the `wavelog` section of `config.jso
 - **Wavelog 3.1 or newer:** create an API v2 token with `qso:read` scope (it starts with `wl2_`). `stationId` isn't needed.
 - **Older Wavelog:** use a read-only API key from the API keys page in Wavelog's menu, plus your station location ID (the small number badge on the Station Locations page).
 
-`url` is your Wavelog address, with or without `/index.php`. QTHClock checks for new QSOs every minute. QSOs logged in WSJT-X appear immediately and are merged with the Wavelog entry when it arrives.
+`url` is your Wavelog address, with or without `/index.php`. QTHClock checks for new QSOs every minute. If Wavelog uses a self-signed HTTPS certificate, add `"skipTLSVerify": true`.
+
+To test the connection, run this on the Pi:
+
+```sh
+./qthclock -check-wavelog
+```
+
+It prints the newest QSOs, or exactly what went wrong (wrong URL, bad key, missing `stationId`, Wavelog too old for a v2 token, and so on). The same error also shows in the QSO panel on the display. QSOs logged in WSJT-X appear immediately and are merged with the Wavelog entry when it arrives.
 
 ### WSJT-X / JTDX
 
-In WSJT-X, open **Settings › Reporting** and set **UDP Server** to `127.0.0.1`, port `2237`, with "Accept UDP requests" ticked. This gives QTHClock who you're working, TX/RX state, the QSOs you log and (if enabled) what you decode. If QTHClock runs on another machine, set the UDP server to that machine's IP, and set `"wsjtx": {"listen": ":2237"}` in `config.json`. Only one program can own the port, so if you already use GridTracker or a logger on 2237, have WSJT-X send to a secondary port or use multicast (planned).
+In WSJT-X, open **Settings › Reporting** and set **UDP Server** to the address of the computer running QTHClock, port `2237`, with "Accept UDP requests" ticked:
+
+- **WSJT-X on the same computer as QTHClock:** `127.0.0.1`.
+- **WSJT-X on your shack PC, QTHClock on a Pi:** the Pi's IP address (the display tells you which one while the radio shows as idle). Make sure `config.json` has `"wsjtx": {"enabled": true, "listen": "0.0.0.0:2237"}`; older configs had `127.0.0.1:2237`, which only accepts data from the Pi itself.
+- **Also using GridTracker, JTAlert or a logger on 2237?** Only one program can own a normal UDP port. Use multicast instead: set WSJT-X's UDP Server to `224.0.0.73` (tick your network interface under "Outgoing interfaces"), point the other programs at the same address, and set `"listen": "224.0.0.73:2237"` here.
+
+This gives QTHClock your band, mode and frequency, who you're working, TX/RX state, the QSOs you log and (if enabled) what you decode. When nothing is coming in, the top bar says why (no data yet, port in use, last heard N minutes ago).
 
 ## Config highlights
 

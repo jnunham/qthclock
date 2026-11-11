@@ -1,4 +1,4 @@
-import type { QSO, Solar, Spot, Working } from "./types.js";
+import type { QSO, Solar, Spot, Working, WSJTXInfo } from "./types.js";
 
 export interface StreamHandlers {
   snapshot(spots: Spot[]): void;
@@ -7,6 +7,8 @@ export interface StreamHandlers {
   working(w: Working): void;
   qsos(q: QSO[]): void;
   settings(s: unknown): void;
+  wavelog(w: { ok: boolean; error: string; at: number }): void;
+  wsjtx(i: WSJTXInfo): void;
   status(connected: boolean): void;
 }
 
@@ -30,6 +32,8 @@ export function connectStream(h: StreamHandlers): EventSource {
   es.addEventListener("working", parse<Working>(h.working));
   es.addEventListener("qsos", parse<QSO[]>(h.qsos));
   es.addEventListener("settings", parse<unknown>(h.settings));
+  es.addEventListener("wsjtx", parse<WSJTXInfo>(h.wsjtx));
+  es.addEventListener("wavelog", parse<{ ok: boolean; error: string; at: number }>(h.wavelog));
   es.onopen = () => h.status(true);
   es.onerror = () => h.status(false);
   return es;

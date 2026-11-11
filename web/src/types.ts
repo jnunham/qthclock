@@ -45,6 +45,7 @@ export interface ServerConfig {
   cont?: string;    // my continent
   wavelog: boolean;
   boot: number;
+  ips?: string[];
 }
 
 /** The station WSJT-X says you're working right now (call is "" between QSOs). */
@@ -83,7 +84,7 @@ export interface DXSelection {
   grid?: string;
   spot?: Spot;
   /** Why this station is the DX: you're working it, you clicked it, or it was picked automatically. */
-  reason?: "working" | "manual" | "auto";
+  reason?: "working" | "manual" | "last";
 }
 
 /** Every panel implements this; main.ts calls update() about once a second. */
@@ -103,6 +104,17 @@ export interface UpdateContext {
   select(sel: DXSelection | undefined): void;
   working?: Working; // only while WSJT-X is running
   qsos: QSO[];
+  wavelog?: { ok: boolean; error: string; at: number };
+  wsjtx?: WSJTXInfo;
   /** The band/mode the radio is on, when following the radio. */
   active?: { band: string; mode: string };
+}
+
+/** Listener diagnostics, shown when the radio looks idle. */
+export interface WSJTXInfo {
+  listen: string;
+  error?: string;
+  lastFrom?: string;
+  lastAt?: number;
+  packets: number;
 }

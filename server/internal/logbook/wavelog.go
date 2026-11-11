@@ -3,6 +3,7 @@ package logbook
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,9 +26,14 @@ type Wavelog struct {
 	StationID string // needed for classic keys
 	Interval  time.Duration
 	Add       func(...QSO)
+	// Status reports whether the last poll worked, so the screen can say why
+	// QSOs aren't showing instead of waiting forever.
+	Status func(ok bool, msg string)
+	// SkipTLSVerify allows a self-signed certificate on a home server.
+	SkipTLSVerify bool
 
 	client *http.Client
-	lastID string
+	lastID int64
 	primed bool
 }
 
@@ -39,19 +45,42 @@ func (w *Wavelog) base() string {
 	return u
 }
 
+func (w *Wavelog) init() {
+	if w.client != nil {
+		return
+	}
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	if w.SkipTLSVerify {
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	w.client = &http.Client{Timeout: 60 * time.Second, Transport: tr}
+}
+
+// Poll runs one fetch. Used by Run and by `qthclock -check-wavelog`.
+func (w *Wavelog) Poll(ctx context.Context) error {
+	w.init()
+	var err error
+	if strings.HasPrefix(w.Key, "wl2_") {
+		err = w.pollV2(ctx)
+	} else {
+		err = w.pollV1(ctx)
+	}
+	if w.Status != nil {
+		if err != nil {
+			w.Status(false, err.Error())
+		} else {
+			w.Status(true, "")
+		}
+	}
+	return err
+}
+
 func (w *Wavelog) Run(ctx context.Context) {
-	w.client = &http.Client{Timeout: 30 * time.Second}
 	if w.Interval <= 0 {
 		w.Interval = time.Minute
 	}
 	for {
-		var err error
-		if strings.HasPrefix(w.Key, "wl2_") {
-			err = w.pollV2(ctx)
-		} else {
-			err = w.pollV1(ctx)
-		}
-		if err != nil && ctx.Err() == nil {
+		if err := w.Poll(ctx); err != nil && ctx.Err() == nil {
 			log.Printf("wavelog: %v", err)
 		}
 		select {
@@ -71,6 +100,10 @@ func (w *Wavelog) pollV2(ctx context.Context) error {
 		return err
 	}
 	var resp struct {
+		Error *struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
 		Data []struct {
 			Call    string `json:"call"`
 			Band    string `json:"band"`
@@ -84,7 +117,10 @@ func (w *Wavelog) pollV2(ctx context.Context) error {
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return fmt.Errorf("unexpected response: %v", err)
+		return notJSON(body)
+	}
+	if resp.Error != nil {
+		return fmt.Errorf("Wavelog says: %s (%s)", resp.Error.Message, resp.Error.Code)
 	}
 	var out []QSO
 	for _, d := range resp.Data {
@@ -107,11 +143,14 @@ func (w *Wavelog) pollV2(ctx context.Context) error {
 }
 
 func (w *Wavelog) pollV1(ctx context.Context) error {
-	from := w.lastID
-	if from == "" {
-		from = "0"
+	if strings.TrimSpace(w.StationID) == "" {
+		return fmt.Errorf(`"stationId" is empty: with a classic API key Wavelog needs your station location ID (the number badge on Wavelog's Station Locations page)`)
 	}
-	payload, _ := json.Marshal(map[string]any{"key": w.Key, "station_id": w.StationID, "fetchfromid": from})
+	var station any = strings.TrimSpace(w.StationID)
+	if n, err := strconv.Atoi(w.StationID); err == nil {
+		station = n
+	}
+	payload, _ := json.Marshal(map[string]any{"key": w.Key, "station_id": station, "fetchfromid": w.lastID})
 	req, _ := http.NewRequestWithContext(ctx, "POST", w.base()+"/api/get_contacts_adif", bytes.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
@@ -123,15 +162,23 @@ func (w *Wavelog) pollV1(ctx context.Context) error {
 		Exported json.Number `json:"exported_qsos"`
 		LastID   json.Number `json:"lastfetchedid"`
 		Message  string      `json:"message"`
+		Status   string      `json:"status"`
+		Reason   string      `json:"reason"`
 		ADIF     string      `json:"adif"`
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
 	if err := dec.Decode(&resp); err != nil {
-		return fmt.Errorf("unexpected response: %v", err)
+		return notJSON(body)
 	}
-	if resp.LastID != "" && resp.LastID != "0" {
-		w.lastID = resp.LastID.String()
+	if resp.Status == "failed" || resp.Reason != "" {
+		return fmt.Errorf("Wavelog says: %s", firstNonEmpty(resp.Reason, resp.Message, resp.Status))
+	}
+	if resp.ADIF == "" && resp.Message != "" && !strings.Contains(strings.ToLower(resp.Message), "success") {
+		return fmt.Errorf("Wavelog says: %s", resp.Message)
+	}
+	if id, err := resp.LastID.Int64(); err == nil && id > 0 {
+		w.lastID = id
 	}
 	qsos := ParseADIF(resp.ADIF)
 	for i := range qsos {
@@ -154,7 +201,10 @@ func (w *Wavelog) pollV1(ctx context.Context) error {
 func (w *Wavelog) do(req *http.Request) ([]byte, error) {
 	resp, err := w.client.Do(req)
 	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "certificate") {
+			return nil, fmt.Errorf(`%v (self-signed certificate? set "skipTLSVerify": true in the wavelog config)`, err)
+		}
+		return nil, fmt.Errorf("can't reach Wavelog at %s: %v", w.base(), err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
@@ -166,7 +216,18 @@ func (w *Wavelog) do(req *http.Request) ([]byte, error) {
 		if len(snippet) > 200 {
 			snippet = snippet[:200]
 		}
-		return nil, fmt.Errorf("%s: HTTP %d %s", req.URL.Path, resp.StatusCode, snippet)
+		hint := ""
+		switch {
+		case resp.StatusCode == 401 && strings.HasPrefix(w.Key, "wl2_"):
+			hint = " (token invalid or expired)"
+		case resp.StatusCode == 401 || resp.StatusCode == 403:
+			hint = " (check the API key and that it has read access)"
+		case resp.StatusCode == 404 && strings.HasPrefix(w.Key, "wl2_"):
+			hint = " (API v2 needs Wavelog 3.1 or newer: update Wavelog, or use a classic read-only API key + stationId)"
+		case resp.StatusCode == 404:
+			hint = ` (check "url": it should be the address you open Wavelog at)`
+		}
+		return nil, fmt.Errorf("%s returned HTTP %d%s: %s", req.URL.Path, resp.StatusCode, hint, snippet)
 	}
 	return body, nil
 }
@@ -228,4 +289,24 @@ func adifQSO(r map[string]string) (QSO, bool) {
 	}
 	return QSO{Call: r["call"], Time: t.UnixMilli(), Band: r["band"], Mode: mode,
 		RSTSent: r["rst_sent"], RSTRcvd: r["rst_rcvd"], Grid: r["gridsquare"], Name: r["name"], Country: r["country"]}, true
+}
+
+func notJSON(body []byte) error {
+	t := strings.TrimSpace(string(body))
+	if strings.HasPrefix(t, "<") {
+		return fmt.Errorf(`Wavelog returned a web page instead of data: check "url" points at your Wavelog (e.g. https://log.example.com) and the API key is right`)
+	}
+	if len(t) > 160 {
+		t = t[:160]
+	}
+	return fmt.Errorf("unexpected reply from Wavelog: %q", t)
+}
+
+func firstNonEmpty(v ...string) string {
+	for _, s := range v {
+		if s != "" {
+			return s
+		}
+	}
+	return "unknown error"
 }

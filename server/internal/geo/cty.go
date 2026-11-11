@@ -66,8 +66,13 @@ func (c *CTY) LoadOrFetch(path, url string) error {
 
 // Download fetches url to path atomically.
 func Download(path, url string) error {
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
+	client := &http.Client{Timeout: 60 * time.Second}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "QTHClock/1.0 (+https://github.com/jnunham/qthclock)")
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}

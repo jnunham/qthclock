@@ -1,5 +1,6 @@
 import type { Panel, ServerConfig, Spot, UpdateContext } from "../types.js";
 import { bandColor } from "../bands.js";
+import { km } from "../astro.js";
 
 const CONTINENTS = ["NA", "SA", "EU", "AF", "AS", "OC"] as const;
 const BANDS = ["160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m"];
@@ -43,7 +44,7 @@ export class Openings implements Panel {
     }
 
     if (!heard.size) {
-      this.body.innerHTML = `<div class="muted hint">Nothing heard near you in the last 15 minutes. This fills in from RBN skimmers within ${Math.round(this.cfg.nearKm).toLocaleString()} km of your QTH.</div>`;
+      this.body.innerHTML = `<div class="muted hint">Nothing heard near you in the last 15 minutes. This fills in from RBN skimmers within ${km(this.cfg.nearKm)} of your QTH.</div>`;
       return;
     }
     const max = Math.max(1, ...[...heard.values()].flatMap((m) => [...m.values()].map((c) => c.size)));

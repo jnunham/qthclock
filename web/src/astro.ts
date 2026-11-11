@@ -63,4 +63,8 @@ export function approxLocal(now: number, lon: number): { time: string; offset: n
   return { time: hhmm(new Date(now + offset * 3600000)), offset };
 }
 
-export const km = (n: number) => `${Math.round(n).toLocaleString()} km`;
+/** Distances are stored in km and shown in the unit chosen in Settings (miles by default). */
+let unit: "mi" | "km" = "mi";
+export function setUnits(u: "mi" | "km") { unit = u; }
+export const km = (n: number) =>
+  unit === "mi" ? `${Math.round(n * 0.621371).toLocaleString()} mi` : `${Math.round(n).toLocaleString()} km`;

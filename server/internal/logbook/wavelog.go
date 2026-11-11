@@ -79,14 +79,23 @@ func (w *Wavelog) Run(ctx context.Context) {
 	if w.Interval <= 0 {
 		w.Interval = time.Minute
 	}
+	wait := w.Interval
 	for {
 		if err := w.Poll(ctx); err != nil && ctx.Err() == nil {
-			log.Printf("wavelog: %v", err)
+			// Back off while it's failing (1, 2, 4 ... up to 10 minutes) so a
+			// down or misconfigured server isn't hammered every minute.
+			wait *= 2
+			if wait > 10*time.Minute {
+				wait = 10 * time.Minute
+			}
+			log.Printf("wavelog: %v (next try in %s)", err, wait)
+		} else {
+			wait = w.Interval
 		}
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(w.Interval):
+		case <-time.After(wait):
 		}
 	}
 }
@@ -94,6 +103,7 @@ func (w *Wavelog) Run(ctx context.Context) {
 func (w *Wavelog) pollV2(ctx context.Context) error {
 	req, _ := http.NewRequestWithContext(ctx, "GET", w.base()+"/api/v2/qso?limit=10", nil)
 	req.Header.Set("Authorization", "Bearer "+w.Key)
+	req.Header.Set("User-Agent", "QTHClock/1.0")
 	req.Header.Set("Accept", "application/json")
 	body, err := w.do(req)
 	if err != nil {

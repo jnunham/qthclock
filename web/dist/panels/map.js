@@ -177,8 +177,20 @@ export class WorldMap {
         c.beginPath();
         c.rect(Math.max(0, P.left), 0, Math.min(w, P.right) - Math.max(0, P.left), h);
         c.clip();
+        const css = getComputedStyle(document.documentElement);
+        const accent = css.getPropertyValue("--accent").trim() || "#4dabf7";
+        const text = css.getPropertyValue("--text").trim() || "#fff";
+        const label = (t, x, y) => {
+            c.font = `600 ${Math.round(11 * f)}px system-ui, sans-serif`;
+            c.textBaseline = "middle";
+            c.lineWidth = 3;
+            c.strokeStyle = "rgba(0,0,0,0.65)";
+            c.strokeText(t, x, y);
+            c.fillStyle = text;
+            c.fillText(t, x, y);
+        };
         // Lines and dots grow with screen size, the text-size setting and zoom.
-        const f = Math.min(2.6, Math.max(1, w / 1500)) * Math.max(0.8, s.scale) * (1 + 0.15 * s.map.zoom);
+        const f = Math.min(2.2, Math.max(1, w / 1600)) * Math.max(0.8, s.scale) * (1 + 0.15 * s.map.zoom);
         if (s.show.grayline) {
             // Smooth gray line: recomputed once a minute, scaled onto the map.
             if (!this.night || ctx.now - this.night.at > 60_000 || this.night.theme !== s.theme) {
@@ -205,19 +217,21 @@ export class WorldMap {
         };
         const home = this.cfg.lat != null && this.cfg.lon != null ? { lat: this.cfg.lat, lon: this.cfg.lon } : undefined;
         const g = buildGeometry(ctx.spots, ctx.now, s.maxAgeMin, s.show.arcs, home, ctx.active?.band);
-        c.lineWidth = 1.3 * f;
+        c.lineWidth = 1.05 * f;
         c.lineCap = "round";
         for (const l of g.lines) {
             c.strokeStyle = l.color;
             c.globalAlpha = l.op;
             path(l.coords);
         }
-        // A line to a station you clicked.
+        // A fine dashed line to a station you clicked.
         if (ctx.dx?.reason === "manual" && home) {
-            c.globalAlpha = 0.9;
-            c.strokeStyle = "#fff";
-            c.lineWidth = 3 * f;
+            c.globalAlpha = 0.85;
+            c.strokeStyle = accent;
+            c.lineWidth = 1.4 * f;
+            c.setLineDash([5 * f, 4 * f]);
             path(greatCircle(home.lat, home.lon, ctx.dx.lat, ctx.dx.lon, 64));
+            c.setLineDash([]);
         }
         this.hit = [];
         for (const d of g.dots) {
@@ -233,23 +247,37 @@ export class WorldMap {
             c.stroke();
         }
         c.globalAlpha = 1;
-        // The DX station (last QSO or clicked): a highlighted marker.
+        // The DX station (last QSO or clicked): a small reticle with its call,
+        // in the theme's accent colour.
         if (ctx.dx) {
             const x = P.Xw(ctx.dx.lon), y = P.Y(ctx.dx.lat);
-            c.strokeStyle = "#fff";
-            c.lineWidth = 2 * f;
+            const r = 5 * f;
+            c.strokeStyle = accent;
+            c.lineWidth = 1.3 * f;
+            c.beginPath();
+            c.arc(x, y, r, 0, Math.PI * 2);
+            c.stroke();
+            c.beginPath();
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                c.moveTo(x + dx * (r + 2 * f), y + dy * (r + 2 * f));
+                c.lineTo(x + dx * (r + 5 * f), y + dy * (r + 5 * f));
+            }
+            c.stroke();
+            label(ctx.dx.call, x + r + 7 * f, y);
+        }
+        // Home: a small dot with a soft halo.
+        if (home) {
+            const x = P.Xw(home.lon), y = P.Y(home.lat);
+            c.fillStyle = accent;
+            c.globalAlpha = 0.25;
             c.beginPath();
             c.arc(x, y, 7 * f, 0, Math.PI * 2);
-            c.stroke();
-        }
-        if (home) {
-            c.fillStyle = "#fff";
-            c.strokeStyle = "#000";
-            c.lineWidth = 2.5 * f;
-            c.beginPath();
-            c.arc(P.Xw(home.lon), P.Y(home.lat), 7 * f, 0, Math.PI * 2);
             c.fill();
-            c.stroke();
+            c.globalAlpha = 1;
+            c.fillStyle = text;
+            c.beginPath();
+            c.arc(x, y, 3 * f, 0, Math.PI * 2);
+            c.fill();
         }
         c.restore();
     }

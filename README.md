@@ -8,7 +8,7 @@ A shack display built around **your station**. It combines HamClock's at-a-glanc
 - **QSOs:** your latest QSOs from **Wavelog**. Your last QSO partner is shown as the DX.
 - **DE / DX:** your location and your last QSO partner's (or any station you click): local time, sunrise and sunset, short- and long-path bearing and distance.
 - **Map** of the whole world (flat, HamClock-style) with the gray line. Lines run from you to each **station hearing you** (the dot is where that station is); a white circle marks the DX / your last QSO. Colour = band. The gray line is a soft gradient through twilight.
-- **Solar:** SFI, Kp and X-ray class from NOAA.
+- **Space weather:** SFI, Kp, A index, X-ray class and hemispheric power, "currently" and "past 24 hours" geomagnetic status, NOAA's aurora oval forecast for your hemisphere, and a 24-hour Kp chart.
 
 ![QTHClock in demo mode](docs/screenshot.png)
 
@@ -57,6 +57,8 @@ QTHClock is built to run on a screen nobody touches:
 - **The map always spans the full width of its panel**, showing all longitudes once on any screen shape (including 34" ultrawides). On wide, short panels it shows roughly 70°N to 40°S; taller panels show more, up to pole to pole. Zoom with the **+ / − / ⌂** buttons on the map (they hide when the mouse is idle) or from **Settings › Map zoom** on your phone; zooming centres on your QTH by default. Lines and dots get thicker on bigger screens. The coastlines and borders (Natural Earth, public domain) are downloaded once to `data/world.json` on first start.
 - **It's calm.** The clock ticks every second; the map and panels redraw every 5 seconds, and "Bands open" once a minute. Nothing flashes.
 - **Themes:** Dark, Ocean, Slate, Amber, Phosphor, Night (red) and Light. Each restyles the map too.
+- **Distances** are in miles by default; switch to kilometres in Settings › Distances.
+- **The layout fits the screen.** The panels you have switched on are arranged so the map keeps a world-map shape and nothing is squeezed: on a wide wall layout, space weather gets a tall column beside the map; on other screens, "Bands open" and "Space weather" move under the map when that fits better.
 - **You control it from any other device.** Open `http://<pi-address>:8073` on your phone or laptop and change settings there; the monitor updates instantly. Settings are stored on the server (`data/display.json`), not in one browser.
 - **It updates itself.** After a `git pull` and restart, open screens reload the new version automatically.
 - **Per-screen tweaks** go in the URL and only affect that screen, e.g. `http://localhost:8073/?scale=1.3&preset=balanced`.
@@ -107,6 +109,19 @@ To test the connection, run this on the Pi:
 
 It prints the newest QSOs, or exactly what went wrong (wrong URL, bad key, missing `stationId`, Wavelog too old for a v2 token, and so on). The same error also shows in the QSO panel on the display.
 
+## Being polite to the data sources
+
+QTHClock is one server shared by every screen you open; browsers never contact outside services. What the server uses:
+
+| Source | How | How often |
+|---|---|---|
+| PSK Reporter | One MQTT connection, subscribed only to spots of your call (not the global firehose) | Pushed live; reconnects back off up to 2 min |
+| Reverse Beacon Network / DX cluster | One telnet connection each | Pushed live; reconnects back off up to 2 min |
+| NOAA SWPC | Small JSON/text files with conditional requests (ETag / If-Modified-Since, so unchanged files cost a 304 with no body) and an identifying User-Agent | Solar flux hourly; Kp 3-hour table every 30 min; Kp now, X-ray and hemispheric power every 10 min; aurora image every 15 min. Errors back off up to an hour |
+| Wavelog (your server) | v2: newest 10 QSOs; classic key: full export once, then only new QSOs | Every minute; errors back off up to 10 min |
+| country-files.com (cty.dat) | One download | Weekly |
+| Natural Earth via jsDelivr (map outline) | One download | Once |
+
 ## Config highlights
 
 | Key | Meaning |
@@ -146,6 +161,8 @@ It prints the newest QSOs, or exactly what went wrong (wrong URL, bad key, missi
 | `web/src/panels/dedx.ts` | DE / DX box |
 | `web/src/panels/bandsummary.ts` | My signal |
 | `web/src/panels/openings.ts` | Bands open from here |
+| `web/src/panels/space.ts`, `server/internal/solar` | Space weather panel and the NOAA poller |
+| `web/src/layout.ts` | Chooses the screen layout |
 | `web/src/panels/qsos.ts` | Recent QSOs |
 | `server/internal/logbook` | Recent QSOs, Wavelog client, ADIF parser |
 | `web/src/panels/map.ts`, `web/src/world.ts` | The world map (canvas, equirectangular) and its outline loader |

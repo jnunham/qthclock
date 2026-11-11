@@ -1,4 +1,4 @@
-import { fetchSettings, mergeSettings, saveSettings, urlOverrides, PRESETS } from "./settings.js";
+import { fetchSettings, mergeSettings, saveSettings, urlOverrides } from "./settings.js";
 import { SpotStore } from "./store.js";
 import { connectStream } from "./stream.js";
 import { initDrawer } from "./drawer.js";
@@ -10,6 +10,9 @@ import { Openings } from "./panels/openings.js";
 import { showSetup } from "./setup.js";
 import { QSOPanel } from "./panels/qsos.js";
 import { modeGroup } from "./bands.js";
+import { SpaceWeather } from "./panels/space.js";
+import { setUnits } from "./astro.js";
+import { gridFor } from "./layout.js";
 /** A station you click stays the DX this long, then the display goes back to your last QSO. */
 const MANUAL_HOLD_MS = 3 * 60_000;
 /** Your last Wavelog QSO is shown as the DX for this long. */
@@ -62,27 +65,34 @@ async function main() {
     const dedx = new DeDx(cfg);
     const mySignal = new BandSummary("me", "My signal · who hears me", cfg.callsign ? "Nobody has reported you yet. Call CQ on FT8, or check RBN for CW." : 'Set "callsign" in config.json.');
     const openings = new Openings(cfg);
+    const space = new SpaceWeather();
     const qsoPanel = new QSOPanel(cfg);
     const side = document.getElementById("side");
     const sideItems = [
-        [dedx, "dedx"], [qsoPanel, "log"], [mySignal, "mySignal"], [openings, "openings"],
+        [dedx, "dedx"], [qsoPanel, "log"], [mySignal, "mySignal"], [openings, "openings"], [space, "space"],
     ];
     for (const [p] of sideItems)
         side.append(p.el);
+    const ids = [[dedx, "dedx"], [qsoPanel, "log"], [mySignal, "mySignal"], [openings, "openings"], [space, "space"]];
     const applyLayout = () => {
         const root = document.documentElement;
         root.dataset.theme = settings.theme;
+        setUnits(settings.units);
         root.style.setProperty("--scale", String(settings.scale));
-        const p = PRESETS[settings.preset] ?? PRESETS.balanced;
-        for (const [panel, key] of sideItems)
-            panel.el.hidden = !settings.show[key];
-        const anySide = sideItems.some(([, key]) => settings.show[key]);
-        const sideVisible = p.side !== "none" && anySide;
+        const visible = ids.filter(([, id]) => settings.show[id === "log" ? "log" : id]).map(([, id]) => id);
         const body = document.getElementById("body");
-        body.dataset.side = sideVisible ? p.side : "none";
-        body.style.setProperty("--side-size", p.size);
-        side.hidden = !sideVisible;
+        const remPx = parseFloat(getComputedStyle(root).fontSize) || 16;
+        const g = gridFor(settings.preset, visible, body.clientWidth || window.innerWidth, body.clientHeight || window.innerHeight * 0.9, remPx);
+        body.style.gridTemplateColumns = g.columns;
+        body.style.gridTemplateRows = g.rows;
+        body.style.gridTemplateAreas = g.areas.map((r) => `"${r.join(" ")}"`).join(" ");
+        for (const [panel, id] of ids) {
+            panel.el.hidden = !g.areas.some((r) => r.includes(id));
+            panel.el.style.gridArea = id;
+        }
+        document.getElementById("map-wrap").style.gridArea = "map";
     };
+    window.addEventListener("resize", () => applyLayout());
     applyLayout();
     const applyShared = (s) => {
         shared = s;

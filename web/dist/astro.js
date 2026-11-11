@@ -51,5 +51,8 @@ export function approxLocal(now, lon) {
     const offset = Math.round(lon / 15);
     return { time: hhmm(new Date(now + offset * 3600000)), offset };
 }
-export const km = (n) => `${Math.round(n).toLocaleString()} km`;
+/** Distances are stored in km and shown in the unit chosen in Settings (miles by default). */
+let unit = "mi";
+export function setUnits(u) { unit = u; }
+export const km = (n) => unit === "mi" ? `${Math.round(n * 0.621371).toLocaleString()} mi` : `${Math.round(n).toLocaleString()} km`;
 //# sourceMappingURL=astro.js.map

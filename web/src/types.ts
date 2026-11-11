@@ -26,9 +26,15 @@ export interface Spot {
 
 export interface Solar {
   sfi?: number;
-  kp?: number;
+  kp?: number;       // latest estimated Kp
+  kpMax24?: number;  // highest 3-hour Kp in the last 24 h
+  a?: number;        // estimated planetary A, today
+  hpiN?: number;     // hemispheric power, GW
+  hpiS?: number;
   xray?: string;
   xrayRaw?: number;
+  kp24?: { t: number; kp: number }[];
+  aurora?: number;   // aurora image version
   updated: number;
 }
 

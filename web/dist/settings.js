@@ -13,13 +13,14 @@ export const PRESETS = {
 };
 export const DEFAULTS = {
     preset: "balanced",
-    show: { clock: true, solar: true, dedx: true, mySignal: true, openings: true, log: true, arcs: true, grayline: true },
+    show: { clock: true, solar: false, dedx: true, mySignal: true, openings: true, space: true, log: true, arcs: true, grayline: true },
     scale: 1,
     theme: "dark",
     maxAgeMin: 15,
     sources: { pskr: true, rbn: true, cluster: true, demo: true },
     followRadio: true,
     map: { zoom: 0, center: "home" },
+    units: "mi",
 };
 /** Fill in anything missing from saved settings with defaults. */
 export function mergeSettings(saved) {

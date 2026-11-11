@@ -19,11 +19,11 @@ export function initDrawer(cfg, get, editStation, set) {
 
       <h3>Panels</h3>
       <div class="checks">
-        ${checkbox("clock", "Clock")}${checkbox("solar", "Solar")}
+        ${checkbox("clock", "Clock")}${checkbox("space", "Space weather")}
         ${checkbox("dedx", "DE / DX")}${checkbox("mySignal", "My signal")}
         ${checkbox("openings", "Bands open")}${checkbox("log", "QSOs")}
         ${checkbox("arcs", "Lines to stations hearing me")}
-        ${checkbox("grayline", "Gray line")}
+        ${checkbox("grayline", "Gray line")}${checkbox("solar", "Solar numbers in top bar")}
       </div>
 
       <h3>Map zoom <span class="muted">${s.map.zoom === 0 ? "whole world" : `+${s.map.zoom}`}</span></h3>
@@ -35,6 +35,12 @@ export function initDrawer(cfg, get, editStation, set) {
       <div class="seg" style="margin-top:0.3rem">
         <button data-mapcenter="home" class="${s.map.center === "home" ? "on" : ""}">Centre on my QTH</button>
         <button data-mapcenter="world" class="${s.map.center === "world" ? "on" : ""}">Centre on world</button>
+      </div>
+
+      <h3>Distances</h3>
+      <div class="seg">
+        <button data-units="mi" class="${s.units === "mi" ? "on" : ""}">Miles</button>
+        <button data-units="km" class="${s.units === "km" ? "on" : ""}">Kilometres</button>
       </div>
 
       <h3>Text size <span class="muted" data-scale-label>${Math.round(s.scale * 100)}%</span></h3>
@@ -69,6 +75,8 @@ export function initDrawer(cfg, get, editStation, set) {
             s.preset = t.dataset.preset;
         else if (t.dataset.theme)
             s.theme = t.dataset.theme;
+        else if (t.dataset.units)
+            s.units = t.dataset.units;
         else if (t.dataset.mapzoom) {
             const z = t.dataset.mapzoom;
             s.map.zoom = z === "world" ? 0 : Math.max(0, Math.min(4, s.map.zoom + (z === "in" ? 0.5 : -0.5)));

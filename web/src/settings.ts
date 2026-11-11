@@ -17,6 +17,7 @@ export interface Settings {
     dedx: boolean;
     mySignal: boolean;
     openings: boolean;
+    space: boolean;
     log: boolean;
     arcs: boolean;
     grayline: boolean;
@@ -27,6 +28,7 @@ export interface Settings {
   sources: Record<string, boolean>;
   followRadio: boolean;   // fade other bands on the map while you're being spotted
   map: MapView;
+  units: "mi" | "km";
 }
 
 export interface MapView {
@@ -44,13 +46,14 @@ export const PRESETS: Record<Preset, { label: string; side: "right" | "bottom" |
 
 export const DEFAULTS: Settings = {
   preset: "balanced",
-  show: { clock: true, solar: true, dedx: true, mySignal: true, openings: true, log: true, arcs: true, grayline: true },
+  show: { clock: true, solar: false, dedx: true, mySignal: true, openings: true, space: true, log: true, arcs: true, grayline: true },
   scale: 1,
   theme: "dark",
   maxAgeMin: 15,
   sources: { pskr: true, rbn: true, cluster: true, demo: true },
   followRadio: true,
   map: { zoom: 0, center: "home" },
+  units: "mi",
 };
 
 /** Fill in anything missing from saved settings with defaults. */

@@ -25,7 +25,7 @@ export class BandSummary {
         this.el.innerHTML = `
       <h2>${title} <span class="muted count"></span></h2>
       <div class="farthest"></div>
-      <div class="srow head muted"><span>Band</span><span>Stations</span><span class="n">Avg report</span><span>Farthest</span></div>
+      <div class="srow head muted"><span>Band</span><span>Stations</span><span class="n">#</span><span class="n">Avg report</span><span>Farthest</span></div>
       <div class="rows"></div>`;
         this.body = this.el.querySelector(".rows");
         this.body.addEventListener("click", (e) => {

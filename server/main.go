@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -87,10 +88,15 @@ func main() {
 	st := &station{cfg: cfg, path: *cfgPath, fileDemo: fileDemo, hub: hub, recent: recent, loc: sources.Locator{CTY: cty}, parent: ctx}
 	st.start()
 
+	// Space weather from NOAA SWPC. Each file is polled at its own pace with
+	// conditional requests; every screen shares this one copy.
+	homeLat, _, _ := geo.GridToLatLon(cfg.Grid)
+	space := solar.NewPoller(homeLat < 0)
 	if cfg.Solar.Enabled {
-		go solar.Poll(ctx, time.Duration(cfg.Solar.IntervalMinutes)*time.Minute, func(r solar.Report) {
-			hub.SetState("solar", r)
-		})
+		if cfg.Demo.Enabled {
+			hub.SetState("solar", solar.DemoReport())
+		}
+		go space.Run(ctx, func(r solar.Report) { hub.SetState("solar", r) })
 	}
 
 	display := newDisplaySettings(cfg.DataDir, hub)
@@ -100,6 +106,16 @@ func main() {
 	mux.HandleFunc("GET /api/world", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=86400")
 		http.ServeFile(w, r, worldPath)
+	})
+	mux.HandleFunc("GET /api/aurora.jpg", func(w http.ResponseWriter, r *http.Request) {
+		img, at := space.Aurora.Get()
+		if img == nil {
+			http.Error(w, "aurora image not downloaded yet", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("Cache-Control", "max-age=600")
+		http.ServeContent(w, r, "aurora.jpg", at, bytes.NewReader(img))
 	})
 	mux.HandleFunc("GET /api/settings", display.get)
 	mux.HandleFunc("PUT /api/settings", display.put)

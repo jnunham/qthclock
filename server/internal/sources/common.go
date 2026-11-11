@@ -15,6 +15,11 @@ import (
 type Locator struct{ CTY *geo.CTY }
 
 func (l Locator) Fill(s *spots.Spot) {
+	if s.DECont == "" {
+		if e, _, _, ok := l.CTY.Lookup(s.DE); ok {
+			s.DECont = e.Continent
+		}
+	}
 	if s.DXCountry == "" {
 		if e, _, _, ok := l.CTY.Lookup(s.DX); ok {
 			s.DXCountry, s.DXCont = e.Name, e.Continent

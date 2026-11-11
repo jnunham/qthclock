@@ -266,12 +266,18 @@ body.idle #mapctl { opacity: 0; pointer-events: none; }
 .radio .onair-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; color: var(--good); }
 
 /* Bands open from here */
-.openings .orows { display: flex; flex-direction: column; gap: 0.12rem; }
+.openings .orows { display: flex; flex-direction: column; gap: 0.08rem; }
 .orow { display: grid; grid-template-columns: 3.4rem repeat(6, 1fr); gap: 0.25rem; align-items: center; font-size: 0.82rem; }
 .orow.head { font-size: 0.7rem; letter-spacing: 0.06em; text-align: center; }
-.orow .cell { height: 1.15rem; border-radius: 0.25rem; text-align: center; line-height: 1.15rem; font-variant-numeric: tabular-nums;
+.orow .cell { height: 1.02rem; border-radius: 0.25rem; text-align: center; line-height: 1.02rem; font-variant-numeric: tabular-nums;
   background: var(--panel-2); color: transparent; }
-.orow .cell.on { background: color-mix(in srgb, var(--c) calc(var(--a) * 100%), var(--panel-2)); color: #0b0f14; font-weight: 600; }
+.orow .cell.you { background: var(--c); color: #0b0f14; font-weight: 700; }
+.orow .cell.hint { background: color-mix(in srgb, var(--c) 12%, var(--panel-2)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 70%, transparent); }
+.olegend { display: flex; gap: 1rem; font-size: 0.72rem; margin-top: 0.35rem; flex-wrap: wrap; }
+.olegend span { display: flex; align-items: center; gap: 0.35rem; }
+.olegend i { width: 0.9rem; height: 0.7rem; border-radius: 0.2rem; display: inline-block; }
+.olegend i.you { background: var(--good); }
+.olegend i.hint { box-shadow: inset 0 0 0 1.5px var(--muted); }
 .orow.quiet .chip { opacity: 0.45; }
 .orow.cur { outline: 1px solid var(--accent); border-radius: 0.3rem; }
 .openings h2 span { text-transform: none; letter-spacing: 0; font-weight: 400; float: right; }

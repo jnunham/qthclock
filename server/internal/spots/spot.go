@@ -25,6 +25,7 @@ type Spot struct {
 	DEGrid    string   `json:"deg,omitempty"`
 	DELat     *float64 `json:"dela,omitempty"`
 	DELon     *float64 `json:"delo,omitempty"`
+	DECont    string   `json:"dc,omitempty"` // spotter's continent, from cty.dat
 	SNR       *int     `json:"snr,omitempty"`
 	WPM       *int     `json:"wpm,omitempty"`
 	Comment   string   `json:"c,omitempty"`
@@ -33,8 +34,9 @@ type Spot struct {
 	//   "me"   - someone heard me (DX is my call)
 	//   "here" - I heard someone (DE is me, or a decode from my own WSJT-X)
 	//   "near" - someone near my QTH heard this DX, so I can probably work it
-	Rel  string   `json:"rel"`
-	Dist *float64 `json:"km,omitempty"` // for "me"/"near": km from my QTH to the far end
+	Rel    string   `json:"rel"`
+	Dist   *float64 `json:"km,omitempty"`  // for "me"/"near": km from my QTH to the far end
+	DEDist *float64 `json:"dek,omitempty"` // for "near": km from my QTH to the spotter
 }
 
 type bandEdge struct {

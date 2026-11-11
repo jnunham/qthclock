@@ -21,7 +21,7 @@ export function initDrawer(cfg, get, editStation, set) {
       <div class="checks">
         ${checkbox("clock", "Clock")}${checkbox("space", "Space weather")}
         ${checkbox("dedx", "DE / DX")}${checkbox("mySignal", "My signal")}
-        ${checkbox("openings", "Bands open")}${checkbox("log", "QSOs")}
+        ${checkbox("openings", "Band openings")}${checkbox("log", "QSOs")}
         ${checkbox("arcs", "Lines to stations hearing me")}
         ${checkbox("grayline", "Gray line")}${checkbox("solar", "Solar numbers in top bar")}
       </div>

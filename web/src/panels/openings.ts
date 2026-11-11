@@ -1,5 +1,5 @@
 import type { Panel, ServerConfig, Spot, UpdateContext } from "../types.js";
-import { bandColor } from "../bands.js";
+import { bandColor, modeGroup } from "../bands.js";
 import { km } from "../astro.js";
 
 const CONTINENTS = ["NA", "SA", "EU", "AF", "AS", "OC"] as const;
@@ -7,59 +7,81 @@ const BANDS = ["160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "
 const WINDOW_MS = 15 * 60_000;
 const REFRESH_MS = 60_000;
 
+/** Skimmers count as "near you" only within this distance. */
+const HINT_RADIUS_KM = 800; // ≈ 500 miles
+
 /**
- * "Bands open from here": for each band, which continents skimmers and
- * cluster spotters near your QTH have heard in the last 15 minutes. A calm
- * propagation summary instead of a scrolling DX list; it refreshes once a
- * minute and never flashes.
+ * Only signals a modest station could plausibly work count as a hint:
+ * skimmers with big antennas decode far weaker signals than you can.
+ */
+function strongEnough(s: Spot): boolean {
+  if (s.snr == null) return s.src === "cluster"; // a person spotted it, so they heard it fine
+  const m = modeGroup(s.m);
+  return m === "CW" || m === "RTTY" ? s.snr >= 15 : s.snr >= -10;
+}
+
+/**
+ * "Band openings": for each band and continent, is there a path from YOUR
+ * QTH right now?
+ *  - solid cell with a number: stations on that continent heard YOU
+ *    (PSK Reporter / RBN) in the last 15 minutes. Direct evidence.
+ *  - outlined cell: skimmers or cluster spotters within ~500 miles of you
+ *    heard stations there with a signal a modest station could work.
+ *    A hint, not proof.
+ * Refreshes once a minute.
  */
 export class Openings implements Panel {
   el: HTMLElement;
   private body: HTMLElement;
   private last = 0;
+  private lastActive = "";
 
   constructor(private cfg: ServerConfig) {
     this.el = document.createElement("section");
     this.el.className = "panel openings";
     this.el.innerHTML = `
-      <h2>Bands open from here <span class="muted">heard near you · 15 min</span></h2>
-      <div class="orows"></div>`;
+      <h2>Band openings <span class="muted">last 15 min</span></h2>
+      <div class="orows"></div>
+      <div class="olegend muted"><span><i class="you"></i>heard you</span><span><i class="hint"></i>strong signals heard within ${km(HINT_RADIUS_KM)} of you</span></div>`;
     this.body = this.el.querySelector(".orows")!;
   }
 
   update(ctx: UpdateContext): void {
-    if (ctx.now - this.last < REFRESH_MS && this.last) return;
+    const active = ctx.onAir?.band ?? "";
+    if (ctx.now - this.last < REFRESH_MS && this.last && active === this.lastActive) return;
     this.last = ctx.now;
+    this.lastActive = active;
 
-    // band -> continent -> set of DX calls
-    const heard = new Map<string, Map<string, Set<string>>>();
-    for (const s of ctx.spots as Spot[]) {
-      if (s.rel !== "near" || ctx.now - s.t > WINDOW_MS || !s.dxk || !s.b) continue;
-      if (this.cfg.country && s.dxc === this.cfg.country) continue; // your own country tells you nothing
-      const byCont = heard.get(s.b) ?? new Map<string, Set<string>>();
-      const calls = byCont.get(s.dxk) ?? new Set<string>();
-      calls.add(s.dx);
-      byCont.set(s.dxk, calls);
-      heard.set(s.b, byCont);
+    const you = new Map<string, Map<string, Set<string>>>(); // band -> continent -> calls that heard me
+    const hint = new Map<string, Set<string>>();              // band -> continents heard strongly nearby
+    for (const s of ctx.spots) {
+      if (ctx.now - s.t > WINDOW_MS || !s.b) continue;
+      if (s.rel === "me" && s.dc) {
+        const byCont = you.get(s.b) ?? new Map<string, Set<string>>();
+        const calls = byCont.get(s.dc) ?? new Set<string>();
+        calls.add(s.de);
+        byCont.set(s.dc, calls);
+        you.set(s.b, byCont);
+      } else if (s.rel === "near" && s.dxk && (s.dek ?? Infinity) <= HINT_RADIUS_KM && strongEnough(s)) {
+        if (this.cfg.country && s.dxc === this.cfg.country) continue; // your own country says nothing about propagation
+        const set = hint.get(s.b) ?? new Set<string>();
+        set.add(s.dxk);
+        hint.set(s.b, set);
+      }
     }
 
-    if (!heard.size) {
-      this.body.innerHTML = `<div class="muted hint">Nothing heard near you in the last 15 minutes. This fills in from RBN skimmers within ${km(this.cfg.nearKm)} of your QTH.</div>`;
-      return;
-    }
-    const max = Math.max(1, ...[...heard.values()].flatMap((m) => [...m.values()].map((c) => c.size)));
     this.body.innerHTML = `
       <div class="orow head muted"><span></span>${CONTINENTS.map((c) => `<span>${c}</span>`).join("")}</div>
       ${BANDS.map((band) => {
-        const m = heard.get(band);
-        const cur = ctx.onAir?.band === band ? " cur" : "";
-        return `<div class="orow${m ? "" : " quiet"}${cur}">
+        const y = you.get(band), h = hint.get(band);
+        const cur = active === band ? " cur" : "";
+        return `<div class="orow${y || h ? "" : " quiet"}${cur}">
           <span class="chip" style="--c:${bandColor(band)}">${band}</span>
           ${CONTINENTS.map((c) => {
-            const n = m?.get(c)?.size ?? 0;
-            // Brightness grows with how many stations were heard.
-            const level = n ? 0.35 + 0.65 * Math.min(1, Math.log2(n + 1) / Math.log2(max + 1)) : 0;
-            return `<span class="cell${n ? " on" : ""}" style="--c:${bandColor(band)};--a:${level.toFixed(2)}" title="${n ? `${n} station${n > 1 ? "s" : ""} in ${c} heard on ${band}` : ""}">${n || ""}</span>`;
+            const n = y?.get(c)?.size ?? 0;
+            if (n) return `<span class="cell you" style="--c:${bandColor(band)}" title="${n} station${n > 1 ? "s" : ""} in ${c} heard you on ${band}">${n}</span>`;
+            if (h?.has(c)) return `<span class="cell hint" style="--c:${bandColor(band)}" title="Stations within ${km(HINT_RADIUS_KM)} of you heard strong signals from ${c} on ${band}"></span>`;
+            return `<span class="cell"></span>`;
           }).join("")}
         </div>`;
       }).join("")}`;

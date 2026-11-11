@@ -34,10 +34,12 @@ func (r Relevance) Tag(s spots.Spot) (spots.Spot, bool) {
 		}
 		return s, true
 	case r.HasQTH && s.DELat != nil:
-		if geo.DistanceKm(r.Lat, r.Lon, *s.DELat, *s.DELon) > r.NearKm {
+		dek := geo.DistanceKm(r.Lat, r.Lon, *s.DELat, *s.DELon)
+		if dek > r.NearKm {
 			return s, false
 		}
 		s.Rel = "near"
+		s.DEDist = &dek
 		if s.DXLat != nil {
 			d := geo.DistanceKm(r.Lat, r.Lon, *s.DXLat, *s.DXLon)
 			s.Dist = &d

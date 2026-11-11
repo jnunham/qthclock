@@ -16,12 +16,14 @@ export interface Spot {
   deg?: string;
   dela?: number;
   delo?: number;
+  dc?: string; // spotter's continent
   snr?: number;
   wpm?: number;
   c?: string;
   /** "me": someone heard me · "here": I heard them · "near": spotted near my QTH */
   rel: "me" | "here" | "near";
   km?: number;
+  dek?: number; // for "near": how far the spotter is from you (km)
 }
 
 export interface Solar {

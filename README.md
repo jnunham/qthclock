@@ -3,7 +3,7 @@
 A shack display built around **your station**. It combines HamClock's at-a-glance operating info with DXLook-style live signal reports, but only shows what matters to you:
 
 - **My signal:** who is hearing you right now on each band, the **average signal report** you're getting (each station's latest report, averaged per mode), and the farthest station (PSK Reporter + RBN).
-- **Bands open from here:** for each band, which continents RBN skimmers and cluster spotters near your QTH are hearing (last 15 minutes). A calm propagation summary, refreshed once a minute; no scrolling DX list.
+- **Band openings:** for each band and continent, is there a path from your QTH right now (last 15 minutes)? A **solid** cell with a number means that many stations on that continent actually heard *you* (PSK Reporter / RBN) — direct evidence. An **outlined** cell is a hint: skimmers or cluster spotters within about 500 miles of you heard stations there with a signal a modest station could work (CW/RTTY ≥ 15 dB, FT8 ≥ −10 dB). Raw skimmer counts aren't shown, because big skimmers hundreds of miles away hear far more than you can. Refreshed once a minute.
 - **On air:** the band and mode you're on, worked out from who's hearing you (like HamSpotter / HamAlert). No radio connection needed.
 - **QSOs:** your latest QSOs from **Wavelog**. Your last QSO partner is shown as the DX.
 - **DE / DX:** your location and your last QSO partner's (or any station you click): local time, sunrise and sunset, short- and long-path bearing and distance.
@@ -52,7 +52,7 @@ Press **s**, or click the gear, for layout, text size, theme and filters. Kiosk 
 
 QTHClock is built to run on a screen nobody touches:
 
-- **It follows you on the air.** The top bar shows the band and mode you're being spotted on (from PSK Reporter / RBN reports of your call over the last 10 minutes). The map fades the other bands, and "My signal" and "Bands open" highlight your band. To turn this off, untick Settings › On air › Follow my spots.
+- **It follows you on the air.** The top bar shows the band and mode you're being spotted on (from PSK Reporter / RBN reports of your call over the last 10 minutes). The map fades the other bands, and "My signal" and "Band openings" highlight your band. To turn this off, untick Settings › On air › Follow my spots.
 - **The DX box shows your last QSO** from Wavelog (for 2 hours). A station you click on the map or in a list stays selected for 3 minutes. The farthest station hearing you is listed under "My signal".
 - **The map always spans the full width of its panel**, showing all longitudes once on any screen shape (including 34" ultrawides). On wide, short panels it shows roughly 70°N to 40°S; taller panels show more, up to pole to pole. Zoom with the **+ / − / ⌂** buttons on the map (they hide when the mouse is idle) or from **Settings › Map zoom** on your phone; zooming centres on your QTH by default. Lines and dots get thicker on bigger screens. The map is drawn from Natural Earth 1:50m (public domain): land, lakes (so the Great Lakes and Michigan show properly), country borders, and state/province lines for the US, Canada, Australia and Brazil. The layers are downloaded once on first start (about 4 MB, from Natural Earth's GitHub) and packed into `data/basemap.json`. No internet on the Pi? Copy `ne_50m_land`, `ne_50m_lakes`, `ne_50m_admin_0_boundary_lines_land` and `ne_50m_admin_1_states_provinces_lines` (`.geojson`) into a folder and start QTHClock with `QTHCLOCK_NATURAL_EARTH=/that/folder`.
 - **It's calm.** The clock ticks every second; the map and panels redraw every 5 seconds, and "Bands open" once a minute. Nothing flashes.
@@ -127,7 +127,7 @@ QTHClock is one server shared by every screen you open; browsers never contact o
 | Key | Meaning |
 |---|---|
 | `callsign`, `grid` | Your station (asked for on first launch). Needed for "who hears me", distances and "near me". |
-| `nearKm` | "Bands open from here" counts RBN/cluster spots whose spotter is within this distance of you (default 1500 km). |
+| `nearKm` | The server keeps RBN/cluster spots whose spotter is within this distance of you (default 1500 km); "Band openings" then uses only spotters within about 500 miles. |
 | `pskreporter.topics` | MQTT topics; `{CALL}` becomes your callsign. Default: who hears you. |
 | `rbn.addrs` | `telnet.reversebeacon.net:7000` is CW/RTTY skimmers, `:7001` is FT8/FT4. Both are on by default; drop one if you never use those modes. |
 | `wavelog` | Your Wavelog logbook (see above). |
@@ -160,7 +160,7 @@ QTHClock is one server shared by every screen you open; browsers never contact o
 | `server/internal/geo`, `solar`, `spots` | Grids and cty.dat, NOAA, hub |
 | `web/src/panels/dedx.ts` | DE / DX box |
 | `web/src/panels/bandsummary.ts` | My signal |
-| `web/src/panels/openings.ts` | Bands open from here |
+| `web/src/panels/openings.ts` | Band openings |
 | `web/src/panels/space.ts`, `server/internal/solar` | Space weather panel and the NOAA poller |
 | `web/src/layout.ts` | Chooses the screen layout |
 | `web/src/panels/qsos.ts` | Recent QSOs |

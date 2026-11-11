@@ -91,6 +91,7 @@ func (d *Demo) Run(ctx context.Context) {
 		switch k := rand.Intn(10); {
 		case k < 6: // someone hears me, mostly on the band I'm on
 			s.Source, s.DX, s.DXGrid, s.DE, s.DEGrid = "pskr", d.Call, d.Grid, other.call, other.grid
+			s.DECont = other.cont
 			d.mu.Lock()
 			cur := d.band
 			d.mu.Unlock()

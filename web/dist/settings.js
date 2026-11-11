@@ -16,6 +16,7 @@ export const DEFAULTS = {
     sources: { pskr: true, wsjtx: true, rbn: true, cluster: true, demo: true },
     dx: { bands: [], modes: [], hideCountry: true, hideCont: false },
     followRadio: true,
+    map: { zoom: 0, center: "home" },
 };
 /** Fill in anything missing from saved settings with defaults. */
 export function mergeSettings(saved) {
@@ -27,6 +28,7 @@ export function mergeSettings(saved) {
         show: { ...d.show, ...saved.show },
         sources: { ...d.sources, ...saved.sources },
         dx: { ...d.dx, ...saved.dx },
+        map: { ...d.map, ...saved.map },
     };
 }
 export function urlOverrides() {

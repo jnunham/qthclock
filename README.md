@@ -54,7 +54,7 @@ QTHClock is built to run on a screen nobody touches:
 
 - **It follows the radio.** WSJT-X sends QTHClock your dial frequency and mode, and the top bar shows your current band, mode, frequency and TX/RX. While WSJT-X is running, "DX near you" shows only your current band and mode, the map fades the other bands, and "My signal" highlights your band. When WSJT-X is closed, the DX list goes back to your saved filters. To turn this off, untick Settings › Radio › Follow WSJT-X.
 - **The DX box follows your QSOs.** It shows the station you're working, with a path drawn on the map; after the QSO it keeps that station (marked "last QSO", no path) until your next one. A station you click stays selected for 3 minutes. The farthest station hearing you is listed under "My signal".
-- **The map shows the world once**, sized to fill the panel on any screen shape (including 34" ultrawides), instead of repeating side by side.
+- **The map shows the world once**, sized to fill the panel on any screen shape (including 34" ultrawides), instead of repeating side by side. Zoom with the **+ / − / ⌂** buttons on the map (they hide when the mouse is idle) or from **Settings › Map zoom** on your phone; zoom is centred on your QTH by default. Lines and dots get thicker on bigger screens.
 - **You control it from any other device.** Open `http://<pi-address>:8073` on your phone or laptop and change settings there; the monitor updates instantly. Settings are stored on the server (`data/display.json`), not in one browser.
 - **It updates itself.** After a `git pull` and restart, open screens reload the new version automatically.
 - **Per-screen tweaks** go in the URL and only affect that screen, e.g. `http://localhost:8073/?scale=1.3&preset=balanced`.

@@ -9,6 +9,7 @@ import { BandSummary } from "./panels/bandsummary.js";
 import { DXSpots } from "./panels/dxspots.js";
 import { showSetup } from "./setup.js";
 import { QSOPanel } from "./panels/qsos.js";
+import { MAX_ZOOM_STEPS } from "./panels/map.js";
 /** A station you click stays the DX this long, then the display goes back to your QSO partner. */
 const MANUAL_HOLD_MS = 3 * 60_000;
 async function main() {
@@ -69,14 +70,16 @@ async function main() {
         applyLayout();
         tick(true);
     };
-    openDrawer = initDrawer(cfg, get, () => showSetup(cfg, false), (s) => {
-        // This screen's URL overrides stay on this screen; everything else is shared.
+    /** Save a settings change: shared with every screen, except this screen's URL overrides. */
+    const commit = (s) => {
         const toSave = { ...s };
         for (const k of Object.keys(overrides))
             toSave[k] = shared[k];
         applyShared(toSave);
         saveSettings(toSave);
-    });
+    };
+    openDrawer = initDrawer(cfg, get, () => showSetup(cfg, false), commit);
+    initMapControls(get, commit);
     connectStream({
         snapshot: (list) => store.replace(list),
         spots: (batch) => store.add(batch),
@@ -160,6 +163,29 @@ async function main() {
     };
     setInterval(() => tick(), 250);
     tick(true);
+}
+/** Zoom buttons on the map. They fade out with the mouse, like the gear. */
+function initMapControls(get, commit) {
+    const box = document.createElement("div");
+    box.id = "mapctl";
+    box.innerHTML = `
+    <button data-z="in" title="Zoom in">+</button>
+    <button data-z="out" title="Zoom out">−</button>
+    <button data-z="world" title="Whole world">⌂</button>`;
+    document.getElementById("map-wrap").append(box);
+    box.addEventListener("click", (e) => {
+        const z = e.target.dataset.z;
+        if (!z)
+            return;
+        const s = structuredClone(get());
+        if (z === "in")
+            s.map.zoom = Math.min(MAX_ZOOM_STEPS, s.map.zoom + 0.5);
+        if (z === "out")
+            s.map.zoom = Math.max(0, s.map.zoom - 0.5);
+        if (z === "world")
+            s.map.zoom = 0;
+        commit(s);
+    });
 }
 main().catch((e) => {
     document.body.innerHTML = `<pre style="color:#f88;padding:2rem">QTHClock failed to start:\n${e}</pre>`;

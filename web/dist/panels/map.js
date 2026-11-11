@@ -2,6 +2,7 @@ import { bandColor } from "../bands.js";
 import { greatCircle, nightPolygon } from "../geo.js";
 const MAX_ARCS = 1200;
 const REDRAW_MS = 1500;
+export const MAX_ZOOM_STEPS = 4;
 /** Picks a MapLibre map when the library loaded, else a plain canvas map. */
 export function createMap(el, cfg, settings) {
     if (typeof maplibregl !== "undefined") {
@@ -26,7 +27,7 @@ function buildGeometry(spots, now, maxAgeMin, arcs, home, activeBand) {
     const dots = new Map();
     for (const s of spots) {
         // Fade with age; when following the radio, other bands fade into the background.
-        const op = Math.max(0.2, 1 - (now - s.t) / span) * (activeBand && s.b !== activeBand ? 0.22 : 1);
+        const op = Math.max(0.25, 1 - (now - s.t) / span) * (activeBand && s.b !== activeBand ? 0.22 : 1);
         const color = bandColor(s.b);
         const far = s.rel === "me" ? { call: s.de, lat: s.dela, lon: s.delo, grid: s.deg } : { call: s.dx, lat: s.dxla, lon: s.dxlo, grid: s.dxg };
         if (far.lat == null || far.lon == null)
@@ -35,7 +36,7 @@ function buildGeometry(spots, now, maxAgeMin, arcs, home, activeBand) {
         if (!dots.has(key))
             dots.set(key, { lon: far.lon, lat: far.lat, color, op, kind: s.rel, call: far.call, grid: far.grid, spot: s });
         if (arcs && home && s.rel !== "near" && lines.length < MAX_ARCS) {
-            lines.push({ coords: greatCircle(home.lat, home.lon, far.lat, far.lon, 24), color, op: op * 0.75, kind: s.rel });
+            lines.push({ coords: greatCircle(home.lat, home.lon, far.lat, far.lon, 32), color, op: op * 0.8, kind: s.rel });
         }
     }
     return { lines, dots: [...dots.values()] };
@@ -43,6 +44,22 @@ function buildGeometry(spots, now, maxAgeMin, arcs, home, activeBand) {
 function selectFromDot(d) {
     return { call: d.call, lat: d.lat, lon: d.lon, grid: d.grid, spot: d.spot };
 }
+/**
+ * How much bigger to draw lines and dots: grows with the panel size (so a
+ * 34" monitor isn't all hairlines), the text-size setting and the zoom.
+ */
+function sizeFactor(el, s) {
+    const bySize = Math.min(2.6, Math.max(1, el.clientWidth / 1500));
+    return bySize * Math.max(0.8, s.scale) * (1 + 0.15 * s.map.zoom);
+}
+/** The view's centre: the whole inhabited world, or your QTH. */
+function viewCenter(view, cfg, worldMidLat) {
+    if (view.center === "home" && view.zoom > 0 && cfg.lat != null && cfg.lon != null)
+        return [cfg.lon, cfg.lat];
+    return [0, worldMidLat];
+}
+// Latitude band that "whole world" fits on screen: about 58°S to 78°N.
+const WORLD_TOP = 78, WORLD_BOTTOM = -58;
 class LiveMap {
     cfg;
     settings;
@@ -55,6 +72,7 @@ class LiveMap {
     dots = [];
     select;
     lastSel = "";
+    lastView = "";
     constructor(el, cfg, settings) {
         this.cfg = cfg;
         this.settings = settings;
@@ -70,28 +88,41 @@ class LiveMap {
         this.map.on("load", () => this.onLoad());
         new ResizeObserver(() => {
             this.map.resize();
-            this.fitWorld();
+            this.lastView = ""; // re-fit on the next update
         }).observe(el);
     }
     /**
-     * Zoom so the whole inhabited world (about 58°S to 78°N) fills the panel
-     * exactly once, whatever the screen shape, and don't allow zooming out
-     * further (which would only add empty space).
+     * Apply the zoom setting: step 0 fits the whole inhabited world exactly
+     * once in the panel, whatever the screen shape; each step zooms in by one
+     * level, centred on your QTH or the world. Also resizes lines and dots.
      */
-    fitWorld() {
-        if (this.globe)
-            return;
+    applyView(s) {
         const w = this.el.clientWidth, h = this.el.clientHeight;
-        if (!w || !h)
+        const key = `${w}x${h}|${s.map.zoom}|${s.map.center}|${s.globe}|${s.scale}`;
+        if (key === this.lastView || !w || !h)
             return;
+        this.lastView = key;
+        const f = sizeFactor(this.el, s);
+        const m = this.map;
+        m.setPaintProperty("arcs-me", "line-width", 1.3 * f);
+        m.setPaintProperty("arcs-here", "line-width", 1.3 * f);
+        m.setPaintProperty("selpath", "line-width", 3.5 * f);
+        m.setPaintProperty("dots", "circle-radius", ["case", ["==", ["get", "kind"], "near"], 4.5 * f, 3.5 * f]);
+        m.setPaintProperty("dots", "circle-stroke-width", ["case", ["==", ["get", "kind"], "near"], 1.8 * f, 0.6 * f]);
+        m.setPaintProperty("home", "circle-radius", 7 * f);
+        if (s.globe) {
+            m.setMinZoom(0);
+            m.jumpTo({ center: viewCenter(s.map, this.cfg, 20), zoom: 1.6 + s.map.zoom });
+            return;
+        }
         const merc = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
-        const top = merc(78), bottom = merc(-58);
+        const top = merc(WORLD_TOP), bottom = merc(WORLD_BOTTOM);
         const zoomW = Math.log2(w / 512);
         const zoomH = Math.log2(h / ((512 * (top - bottom)) / (2 * Math.PI)));
-        const zoom = Math.min(zoomW, zoomH);
+        const fit = Math.min(zoomW, zoomH);
         const midLat = (2 * Math.atan(Math.exp((top + bottom) / 2)) - Math.PI / 2) * (180 / Math.PI);
-        this.map.setMinZoom(zoom);
-        this.map.jumpTo({ center: [0, midLat], zoom });
+        m.setMinZoom(fit);
+        m.jumpTo({ center: viewCenter(s.map, this.cfg, midLat), zoom: fit + s.map.zoom });
     }
     onLoad() {
         const m = this.map;
@@ -100,7 +131,7 @@ class LiveMap {
             m.addSource(id, { type: "geojson", data: empty });
         m.addLayer({ id: "night", type: "fill", source: "night", paint: { "fill-color": "#000814", "fill-opacity": 0.45 } });
         // Paths: solid = someone hears me, dashed = I hear them. Colour = band.
-        const arcPaint = { "line-color": ["get", "color"], "line-opacity": ["get", "op"], "line-width": ["interpolate", ["linear"], ["zoom"], 1, 1.1, 5, 2.5] };
+        const arcPaint = { "line-color": ["get", "color"], "line-opacity": ["get", "op"], "line-width": 1.3 };
         m.addLayer({ id: "arcs-me", type: "line", source: "arcs", filter: ["==", ["get", "kind"], "me"], layout: { "line-cap": "round" }, paint: arcPaint });
         m.addLayer({ id: "arcs-here", type: "line", source: "arcs", filter: ["==", ["get", "kind"], "here"], paint: { ...arcPaint, "line-dasharray": [3, 2] } });
         m.addLayer({
@@ -111,11 +142,11 @@ class LiveMap {
         m.addLayer({
             id: "dots", type: "circle", source: "dots",
             paint: {
-                "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["case", ["==", ["get", "kind"], "near"], 4, 3], 6, 8],
+                "circle-radius": 3.5,
                 "circle-color": ["case", ["==", ["get", "kind"], "near"], "rgba(0,0,0,0)", ["get", "color"]],
                 "circle-opacity": ["get", "op"],
                 "circle-stroke-color": ["case", ["==", ["get", "kind"], "near"], ["get", "color"], "#000"],
-                "circle-stroke-width": ["case", ["==", ["get", "kind"], "near"], 1.8, 0.6],
+                "circle-stroke-width": 0.6,
                 "circle-stroke-opacity": ["get", "op"],
             },
         });
@@ -133,7 +164,6 @@ class LiveMap {
         });
         m.on("mouseenter", "dots", () => (m.getCanvas().style.cursor = "pointer"));
         m.on("mouseleave", "dots", () => (m.getCanvas().style.cursor = ""));
-        this.fitWorld();
         this.ready = true;
     }
     update(ctx) {
@@ -147,11 +177,8 @@ class LiveMap {
                 this.map.setProjection({ type: s.globe ? "globe" : "mercator" });
             }
             catch { /* older MapLibre */ }
-            if (s.globe)
-                this.map.setMinZoom(0);
-            else
-                this.fitWorld();
         }
+        this.applyView(s);
         const nightHidden = this.map.getLayoutProperty("night", "visibility") === "none";
         if (ctx.now - this.lastNight > 60_000 || nightHidden === s.show.grayline) {
             this.lastNight = ctx.now;
@@ -211,7 +238,7 @@ class CanvasMap {
         this.canvas.addEventListener("click", (e) => {
             const r = this.canvas.getBoundingClientRect();
             const x = e.clientX - r.left, y = e.clientY - r.top;
-            let best, bd = 12 * 12;
+            let best, bd = 14 * 14;
             for (const h of this.hit) {
                 const dd = (h.x - x) ** 2 + (h.y - y) ** 2;
                 if (dd < bd) {
@@ -234,65 +261,74 @@ class CanvasMap {
         }
         const c = this.canvas.getContext("2d");
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const ww = Math.min(w, h * 2), wh = ww / 2;
-        const ox = (w - ww) / 2, oy = (h - wh) / 2;
-        const X = (lon) => ox + ((((lon + 540) % 360) - 180 + 180) / 360) * ww;
-        const Y = (lat) => oy + ((90 - lat) / 180) * wh;
+        // World width at zoom 0 fits the panel once; each zoom step doubles it.
+        const fitW = Math.min(w, h * 2);
+        const W = fitW * 2 ** s.map.zoom;
+        const [cLon, cLat] = viewCenter(s.map, this.cfg, 0);
+        const rel = (lon) => ((((lon - cLon) % 360) + 540) % 360) - 180; // -180..180 around the centre
+        const X = (lon) => w / 2 + (rel(lon) / 360) * W;
+        const Xraw = (lon) => w / 2 + ((lon - cLon) / 360) * W;
+        const Y = (lat) => h / 2 + ((cLat - lat) / 360) * W;
+        const f = sizeFactor(this.el, s);
         const css = getComputedStyle(document.documentElement);
         c.clearRect(0, 0, w, h);
+        const left = Math.max(0, w / 2 - W / 2), right = Math.min(w, w / 2 + W / 2);
+        const topY = Math.max(0, Y(90)), botY = Math.min(h, Y(-90));
         c.fillStyle = css.getPropertyValue("--map-sea").trim() || "#0b1622";
-        c.fillRect(ox, oy, ww, wh);
+        c.fillRect(left, topY, right - left, botY - topY);
+        c.save();
+        c.beginPath();
+        c.rect(left, topY, right - left, botY - topY);
+        c.clip();
         c.strokeStyle = "rgba(255,255,255,0.08)";
         c.lineWidth = 1;
-        for (let lon = -180; lon <= 180; lon += 30) {
+        for (let lon = -180; lon < 180; lon += 30) {
             c.beginPath();
-            c.moveTo(ox + ((lon + 180) / 360) * ww, Y(90));
-            c.lineTo(ox + ((lon + 180) / 360) * ww, Y(-90));
+            c.moveTo(X(lon), Y(90));
+            c.lineTo(X(lon), Y(-90));
             c.stroke();
         }
         for (let lat = -60; lat <= 60; lat += 30) {
             c.beginPath();
-            c.moveTo(ox, Y(lat));
-            c.lineTo(ox + ww, Y(lat));
+            c.moveTo(0, Y(lat));
+            c.lineTo(w, Y(lat));
             c.stroke();
         }
         if (s.show.grayline) {
             const ring = nightPolygon(new Date(ctx.now), 90);
             c.fillStyle = "rgba(0,0,0,0.45)";
-            c.beginPath();
-            ring.forEach(([lo, la], i) => { const x = ox + ((lo + 180) / 360) * ww; i ? c.lineTo(x, Y(la)) : c.moveTo(x, Y(la)); });
-            c.fill();
+            for (const shift of [-360, 0, 360]) {
+                c.beginPath();
+                ring.forEach(([lo, la], i) => (i ? c.lineTo(Xraw(lo + shift), Y(la)) : c.moveTo(Xraw(lo + shift), Y(la))));
+                c.fill();
+            }
         }
         const path = (coords) => {
             c.beginPath();
             coords.forEach(([lo, la], i) => {
-                const wrapped = ((lo + 540) % 360) - 180;
-                const prev = i ? ((coords[i - 1][0] + 540) % 360) - 180 : wrapped;
-                if (i === 0 || Math.abs(wrapped - prev) > 180)
-                    c.moveTo(X(wrapped), Y(la));
+                const r = rel(lo);
+                const prev = i ? rel(coords[i - 1][0]) : r;
+                if (i === 0 || Math.abs(r - prev) > 180)
+                    c.moveTo(X(lo), Y(la));
                 else
-                    c.lineTo(X(wrapped), Y(la));
+                    c.lineTo(X(lo), Y(la));
             });
             c.stroke();
         };
         const home = this.cfg.lat != null && this.cfg.lon != null ? { lat: this.cfg.lat, lon: this.cfg.lon } : undefined;
         const g = buildGeometry(ctx.spots, ctx.now, s.maxAgeMin, s.show.arcs, home, ctx.active?.band);
-        c.save();
-        c.beginPath();
-        c.rect(ox, oy, ww, wh);
-        c.clip();
-        c.lineWidth = 1.2;
+        c.lineWidth = 1.3 * f;
         for (const l of g.lines) {
             c.strokeStyle = l.color;
             c.globalAlpha = l.op;
-            c.setLineDash(l.kind === "here" ? [6, 4] : []);
+            c.setLineDash(l.kind === "here" ? [6 * f, 4 * f] : []);
             path(l.coords);
         }
         c.setLineDash([]);
         if (ctx.dx && ctx.dx.reason !== "last" && home) {
             c.globalAlpha = 0.9;
             c.strokeStyle = "#fff";
-            c.lineWidth = 3.5;
+            c.lineWidth = 3.5 * f;
             path(greatCircle(home.lat, home.lon, ctx.dx.lat, ctx.dx.lon, 64));
         }
         this.hit = [];
@@ -301,10 +337,10 @@ class CanvasMap {
             this.hit.push({ x, y, d });
             c.globalAlpha = d.op;
             c.beginPath();
-            c.arc(x, y, d.kind === "near" ? 4.5 : 3.5, 0, Math.PI * 2);
+            c.arc(x, y, (d.kind === "near" ? 4.5 : 3.5) * f, 0, Math.PI * 2);
             if (d.kind === "near") {
                 c.strokeStyle = d.color;
-                c.lineWidth = 1.8;
+                c.lineWidth = 1.8 * f;
                 c.stroke();
             }
             else {
@@ -312,17 +348,17 @@ class CanvasMap {
                 c.fill();
             }
         }
-        c.restore();
         c.globalAlpha = 1;
         if (home) {
             c.fillStyle = "#fff";
             c.strokeStyle = "#000";
-            c.lineWidth = 2.5;
+            c.lineWidth = 2.5 * f;
             c.beginPath();
-            c.arc(X(home.lon), Y(home.lat), 7, 0, Math.PI * 2);
+            c.arc(X(home.lon), Y(home.lat), 7 * f, 0, Math.PI * 2);
             c.fill();
             c.stroke();
         }
+        c.restore();
     }
 }
 //# sourceMappingURL=map.js.map

@@ -24,6 +24,12 @@ export interface Settings {
   sources: Record<string, boolean>;
   dx: DXFilter;           // filters for "DX near you"
   followRadio: boolean;   // follow WSJT-X's band and mode automatically
+  map: MapView;
+}
+
+export interface MapView {
+  zoom: number;              // 0 = whole world; each step zooms in further
+  center: "world" | "home";  // what to centre on when zoomed in
 }
 
 export interface DXFilter {
@@ -50,6 +56,7 @@ export const DEFAULTS: Settings = {
   sources: { pskr: true, wsjtx: true, rbn: true, cluster: true, demo: true },
   dx: { bands: [], modes: [], hideCountry: true, hideCont: false },
   followRadio: true,
+  map: { zoom: 0, center: "home" },
 };
 
 /** Fill in anything missing from saved settings with defaults. */
@@ -61,6 +68,7 @@ export function mergeSettings(saved: Partial<Settings> | null | undefined): Sett
     show: { ...d.show, ...saved.show },
     sources: { ...d.sources, ...saved.sources },
     dx: { ...d.dx, ...saved.dx },
+    map: { ...d.map, ...saved.map },
   };
 }
 

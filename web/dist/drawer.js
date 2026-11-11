@@ -29,6 +29,17 @@ export function initDrawer(cfg, get, editStation, set) {
         <label class="check"><input type="checkbox" data-globe ${s.globe ? "checked" : ""}> Globe view</label>
       </div>
 
+      <h3>Map zoom <span class="muted">${s.map.zoom === 0 ? "whole world" : `+${s.map.zoom}`}</span></h3>
+      <div class="seg">
+        <button data-mapzoom="out">− Out</button>
+        <button data-mapzoom="world" class="${s.map.zoom === 0 ? "on" : ""}">Whole world</button>
+        <button data-mapzoom="in">In +</button>
+      </div>
+      <div class="seg" style="margin-top:0.3rem">
+        <button data-mapcenter="home" class="${s.map.center === "home" ? "on" : ""}">Centre on my QTH</button>
+        <button data-mapcenter="world" class="${s.map.center === "world" ? "on" : ""}">Centre on world</button>
+      </div>
+
       <h3>Text size <span class="muted" data-scale-label>${Math.round(s.scale * 100)}%</span></h3>
       <input type="range" min="0.7" max="2.5" step="0.05" value="${s.scale}" data-scale>
 
@@ -71,6 +82,12 @@ export function initDrawer(cfg, get, editStation, set) {
             s.preset = t.dataset.preset;
         else if (t.dataset.theme)
             s.theme = t.dataset.theme;
+        else if (t.dataset.mapzoom) {
+            const z = t.dataset.mapzoom;
+            s.map.zoom = z === "world" ? 0 : Math.max(0, Math.min(4, s.map.zoom + (z === "in" ? 0.5 : -0.5)));
+        }
+        else if (t.dataset.mapcenter)
+            s.map.center = t.dataset.mapcenter;
         else if (t.dataset.band)
             s.dx.bands = toggle(s.dx.bands, t.dataset.band);
         else if (t.dataset.mode)

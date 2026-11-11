@@ -178,3 +178,18 @@ To add a panel: write a class with `el` and `update(ctx)`, add it to `sideItems`
 - Radio band/mode from flrig / Hamlib (rigctld) as an alternative to "on air" from spots
 - Rotator control from the DX bearing
 - Satellite passes, NCDXF beacons, contest and DXpedition calendars
+
+## Acknowledgements
+
+QTHClock is a thin layer over data that other hams and organisations collect and share for free. Thank you to:
+
+- **PSK Reporter**, created and run by Philip Gladstone, N1DQ, and the **PSK Reporter MQTT feed** at [mqtt.pskreporter.info](https://www.mqtt.pskreporter.info/), run by Tom, M0LTE, on donated hosting with Philip's permission. "My signal", "On air", the map lines and "Band openings" all come from these.
+- The **[Reverse Beacon Network](https://www.reversebeacon.net/)** and its volunteer skimmer operators.
+- **DX cluster** node operators and the hams who post spots.
+- **[NOAA Space Weather Prediction Center](https://www.swpc.noaa.gov/)**: solar flux, K and A indices, X-ray flux, hemispheric power and the OVATION aurora forecast (US Government data).
+- **[Natural Earth](https://www.naturalearthdata.com/)** (public domain) for the map's coastlines, lakes and borders.
+- **Jim Reisert, AD1C**, for the [country files](https://www.country-files.com/) (`cty.dat`) used to place stations on the map.
+- The **[Wavelog](https://www.wavelog.org/)** project, for a logbook with an open API.
+- **Elwood Downey, WB0OEW (SK)**, whose [HamClock](https://www.clearskyinstitute.com/ham/HamClock/) inspired this project.
+
+If you run one of these services and would like QTHClock to use it differently, please open an issue.

@@ -64,6 +64,38 @@ export function nightPolygon(date: Date, maxLat = 85): [number, number][] {
   return ring;
 }
 
+/**
+ * Night/twilight shading as a 360×180 image (1° per pixel, equirectangular,
+ * top-left = 180°W 90°N): transparent in daylight, darkening smoothly
+ * through civil and nautical twilight to full night at the sun 12° below the
+ * horizon. Scale it onto the map with smoothing for a soft gray line.
+ */
+export function nightImage(date: Date, maxAlpha: number, rgb: [number, number, number] = [0, 0, 0]): HTMLCanvasElement {
+  const sun = sunPosition(date);
+  const sd = Math.sin(sun.lat * RAD), cd = Math.cos(sun.lat * RAD);
+  const cv = document.createElement("canvas");
+  cv.width = 360;
+  cv.height = 180;
+  const ctx = cv.getContext("2d")!;
+  const img = ctx.createImageData(360, 180);
+  for (let j = 0; j < 180; j++) {
+    const lat = (89.5 - j) * RAD;
+    const sl = Math.sin(lat), cl = Math.cos(lat);
+    for (let i = 0; i < 360; i++) {
+      const H = (-179.5 + i - sun.lon) * RAD;
+      const elev = Math.asin(sl * sd + cl * cd * Math.cos(H)) * DEG;
+      // 0 at sunset, 1 at -12°, smooth in between.
+      const t = Math.min(1, Math.max(0, -elev / 12));
+      const a = t * t * (3 - 2 * t) * maxAlpha;
+      const k = (j * 360 + i) * 4;
+      img.data[k] = rgb[0]; img.data[k + 1] = rgb[1]; img.data[k + 2] = rgb[2];
+      img.data[k + 3] = Math.round(a * 255);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv;
+}
+
 export function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const a = Math.sin(((lat2 - lat1) * RAD) / 2) ** 2 +
     Math.cos(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.sin(((lon2 - lon1) * RAD) / 2) ** 2;

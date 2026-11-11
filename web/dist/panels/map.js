@@ -1,36 +1,33 @@
 import { bandColor } from "../bands.js";
-import { greatCircle, nightPolygon } from "../geo.js";
+import { greatCircle, nightImage } from "../geo.js";
 import { loadWorld } from "../world.js";
 const MAX_ARCS = 1200;
 export const MAX_ZOOM_STEPS = 4;
 /**
- * Latitudes that "whole world" fits on screen: 75°N to 60°S covers every
- * station you'll ever spot, and skips Antarctica and the polar ice so the
- * map is as big as possible on any screen shape.
+ * The map always spans all 360° of longitude across the panel. How much
+ * latitude shows depends on the panel's shape: a wide, short panel shows
+ * about 70°N to 40°S (everywhere you'll realistically spot), a taller one
+ * shows more, up to pole to pole. Only if the panel is extremely wide does
+ * the map stop filling the width, rather than cropping more than that.
  */
-const TOP_LAT = 75, BOTTOM_LAT = -60;
-/**
- * What the map draws, from the operator's point of view:
- *  - "me":   a line from my QTH to each station hearing me, dot at the hearer
- *  - "near": a ring at DX heard by someone near me (no line)
- */
+const MIN_LAT_SPAN = 110;
+/** What the map draws: a line from my QTH to each station hearing me, and a dot where it is. */
 function buildGeometry(spots, now, maxAgeMin, arcs, home, activeBand) {
     const span = maxAgeMin * 60_000;
     const lines = [];
     const dots = new Map();
     for (const s of spots) {
-        if (s.rel !== "me" && s.rel !== "near")
+        if (s.rel !== "me")
             continue;
         // Fade with age; bands you're not on fade into the background.
         const op = Math.max(0.25, 1 - (now - s.t) / span) * (activeBand && s.b !== activeBand ? 0.22 : 1);
         const color = bandColor(s.b);
-        const far = s.rel === "me" ? { call: s.de, lat: s.dela, lon: s.delo, grid: s.deg } : { call: s.dx, lat: s.dxla, lon: s.dxlo, grid: s.dxg };
+        const far = { call: s.de, lat: s.dela, lon: s.delo, grid: s.deg };
         if (far.lat == null || far.lon == null)
             continue;
-        const key = s.rel + "|" + far.call;
-        if (!dots.has(key))
-            dots.set(key, { lon: far.lon, lat: far.lat, color, op, kind: s.rel, call: far.call, grid: far.grid, spot: s });
-        if (arcs && home && s.rel === "me" && lines.length < MAX_ARCS) {
+        if (!dots.has(far.call))
+            dots.set(far.call, { lon: far.lon, lat: far.lat, color, op, call: far.call, grid: far.grid, spot: s });
+        if (arcs && home && lines.length < MAX_ARCS) {
             lines.push({ coords: greatCircle(home.lat, home.lon, far.lat, far.lon, 32), color, op: op * 0.8 });
         }
     }
@@ -51,6 +48,7 @@ export class WorldMap {
     baseKey = "";
     world;
     hit = [];
+    night;
     select;
     constructor(el, cfg, settings) {
         this.cfg = cfg;
@@ -85,13 +83,14 @@ export class WorldMap {
     }
     /** Projection for the current panel size and zoom setting. */
     projection(w, h, view) {
-        const latSpan = TOP_LAT - BOTTOM_LAT;
-        // Pixels per degree that fit the whole world (360° wide, latSpan tall) once.
-        const fit = Math.min(w / 360, h / latSpan);
+        // Pixels per degree: fill the width, unless that would crop below MIN_LAT_SPAN.
+        const fit = Math.min(w / 360, h / MIN_LAT_SPAN);
+        const span = Math.min(180, h / fit); // latitude shown at zoom 0
         const k = fit * 2 ** view.zoom;
         const zoomed = view.zoom > 0 && view.center === "home" && this.cfg.lat != null && this.cfg.lon != null;
         const cLon = zoomed ? this.cfg.lon : 0;
-        let cLat = zoomed ? this.cfg.lat : (TOP_LAT + BOTTOM_LAT) / 2;
+        // When latitude is cropped, favour the north (where most stations are).
+        let cLat = zoomed ? this.cfg.lat : 15 * (1 - (span - MIN_LAT_SPAN) / (180 - MIN_LAT_SPAN));
         // Don't scroll past the top/bottom of the world when zoomed in.
         const halfH = h / 2 / k;
         cLat = Math.min(90 - halfH, Math.max(-90 + halfH, cLat));
@@ -133,7 +132,8 @@ export class WorldMap {
                 c.fill("evenodd");
             }
             c.strokeStyle = v("--map-border", "rgba(255,255,255,0.18)");
-            c.lineWidth = Math.max(0.6, Math.min(1.6, P.k / 6));
+            c.lineWidth = Math.max(0.5, Math.min(1.4, P.k / 7));
+            c.lineJoin = "round";
             for (const shift of shifts) {
                 c.beginPath();
                 for (const ring of this.world.borders)
@@ -142,7 +142,7 @@ export class WorldMap {
             }
         }
         // Graticule every 30°.
-        c.strokeStyle = "rgba(255,255,255,0.06)";
+        c.strokeStyle = v("--map-grid", "rgba(255,255,255,0.05)");
         c.lineWidth = 1;
         c.beginPath();
         for (let lon = -180; lon < 180; lon += 30) {
@@ -180,12 +180,16 @@ export class WorldMap {
         // Lines and dots grow with screen size, the text-size setting and zoom.
         const f = Math.min(2.6, Math.max(1, w / 1500)) * Math.max(0.8, s.scale) * (1 + 0.15 * s.map.zoom);
         if (s.show.grayline) {
-            const ring = nightPolygon(new Date(ctx.now), 90);
-            c.fillStyle = "rgba(0,0,0,0.42)";
-            for (const shift of [-360, 0, 360]) {
-                c.beginPath();
-                ring.forEach(([lo, la], i) => (i ? c.lineTo(P.X(lo + shift), P.Y(la)) : c.moveTo(P.X(lo + shift), P.Y(la))));
-                c.fill();
+            // Smooth gray line: recomputed once a minute, scaled onto the map.
+            if (!this.night || ctx.now - this.night.at > 60_000 || this.night.theme !== s.theme) {
+                const css = getComputedStyle(document.documentElement);
+                const alpha = Number(css.getPropertyValue("--map-night-alpha")) || 0.5;
+                this.night = { img: nightImage(new Date(ctx.now), alpha), at: ctx.now, theme: s.theme };
+            }
+            c.imageSmoothingEnabled = true;
+            c.imageSmoothingQuality = "high";
+            for (const shift of P.cLon === 0 ? [0] : [-360, 0, 360]) {
+                c.drawImage(this.night.img, P.X(-180 + shift), P.Y(90), 360 * P.k, 180 * P.k);
             }
         }
         const path = (coords) => {
@@ -221,19 +225,12 @@ export class WorldMap {
             this.hit.push({ x, y, d });
             c.globalAlpha = d.op;
             c.beginPath();
-            c.arc(x, y, (d.kind === "near" ? 4.5 : 3.5) * f, 0, Math.PI * 2);
-            if (d.kind === "near") {
-                c.strokeStyle = d.color;
-                c.lineWidth = 1.8 * f;
-                c.stroke();
-            }
-            else {
-                c.fillStyle = d.color;
-                c.fill();
-                c.strokeStyle = "rgba(0,0,0,0.6)";
-                c.lineWidth = 0.8;
-                c.stroke();
-            }
+            c.arc(x, y, 3.5 * f, 0, Math.PI * 2);
+            c.fillStyle = d.color;
+            c.fill();
+            c.strokeStyle = "rgba(0,0,0,0.6)";
+            c.lineWidth = 0.8;
+            c.stroke();
         }
         c.globalAlpha = 1;
         // The DX station (last QSO or clicked): a highlighted marker.

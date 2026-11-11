@@ -3,11 +3,11 @@
 A shack display built around **your station**. It combines HamClock's at-a-glance operating info with DXLook-style live signal reports, but only shows what matters to you:
 
 - **My signal:** who is hearing you right now on each band, the **average signal report** you're getting (each station's latest report, averaged per mode), and the farthest station (PSK Reporter + RBN).
-- **DX near you:** cluster and RBN spots heard by skimmers close to your QTH, so these are stations you can very likely work. Filter by the modes and bands you're working; your own country is hidden by default (optionally your whole continent).
+- **Bands open from here:** for each band, which continents RBN skimmers and cluster spotters near your QTH are hearing (last 15 minutes). A calm propagation summary, refreshed once a minute; no scrolling DX list.
 - **On air:** the band and mode you're on, worked out from who's hearing you (like HamSpotter / HamAlert). No radio connection needed.
 - **QSOs:** your latest QSOs from **Wavelog**. Your last QSO partner is shown as the DX.
 - **DE / DX:** your location and your last QSO partner's (or any station you click): local time, sunrise and sunset, short- and long-path bearing and distance.
-- **Map** of the whole world (flat, HamClock-style) with the gray line. Lines run from you to each **station hearing you** (the dot is where that station is); hollow rings are **DX spotted near you** that you could work; a white circle marks the DX / your last QSO. Colour = band.
+- **Map** of the whole world (flat, HamClock-style) with the gray line. Lines run from you to each **station hearing you** (the dot is where that station is); a white circle marks the DX / your last QSO. Colour = band. The gray line is a soft gradient through twilight.
 - **Solar:** SFI, Kp and X-ray class from NOAA.
 
 ![QTHClock in demo mode](docs/screenshot.png)
@@ -52,9 +52,11 @@ Press **s**, or click the gear, for layout, text size, theme and filters. Kiosk 
 
 QTHClock is built to run on a screen nobody touches:
 
-- **It follows you on the air.** The top bar shows the band and mode you're being spotted on (from PSK Reporter / RBN reports of your call over the last 10 minutes). "DX near you" then shows only that band and mode, the map fades the other bands, and "My signal" highlights your band. When nobody has spotted you for 10 minutes, the DX list goes back to your saved filters. To turn this off, untick Settings › On air › Follow my spots.
+- **It follows you on the air.** The top bar shows the band and mode you're being spotted on (from PSK Reporter / RBN reports of your call over the last 10 minutes). The map fades the other bands, and "My signal" and "Bands open" highlight your band. To turn this off, untick Settings › On air › Follow my spots.
 - **The DX box shows your last QSO** from Wavelog (for 2 hours). A station you click on the map or in a list stays selected for 3 minutes. The farthest station hearing you is listed under "My signal".
-- **The map always fits the whole world once**, on any screen shape (including 34" ultrawides). Zoom with the **+ / − / ⌂** buttons on the map (they hide when the mouse is idle) or from **Settings › Map zoom** on your phone; zooming centres on your QTH by default. Lines and dots get thicker on bigger screens. The coastlines and borders (Natural Earth, public domain) are downloaded once to `data/world.json` on first start.
+- **The map always spans the full width of its panel**, showing all longitudes once on any screen shape (including 34" ultrawides). On wide, short panels it shows roughly 70°N to 40°S; taller panels show more, up to pole to pole. Zoom with the **+ / − / ⌂** buttons on the map (they hide when the mouse is idle) or from **Settings › Map zoom** on your phone; zooming centres on your QTH by default. Lines and dots get thicker on bigger screens. The coastlines and borders (Natural Earth, public domain) are downloaded once to `data/world.json` on first start.
+- **It's calm.** The clock ticks every second; the map and panels redraw every 5 seconds, and "Bands open" once a minute. Nothing flashes.
+- **Themes:** Dark, Ocean, Slate, Amber, Phosphor, Night (red) and Light. Each restyles the map too.
 - **You control it from any other device.** Open `http://<pi-address>:8073` on your phone or laptop and change settings there; the monitor updates instantly. Settings are stored on the server (`data/display.json`), not in one browser.
 - **It updates itself.** After a `git pull` and restart, open screens reload the new version automatically.
 - **Per-screen tweaks** go in the URL and only affect that screen, e.g. `http://localhost:8073/?scale=1.3&preset=balanced`.
@@ -110,7 +112,7 @@ It prints the newest QSOs, or exactly what went wrong (wrong URL, bad key, missi
 | Key | Meaning |
 |---|---|
 | `callsign`, `grid` | Your station (asked for on first launch). Needed for "who hears me", distances and "near me". |
-| `nearKm` | A cluster/RBN spot is "near you" if its spotter is within this distance (default 1500 km). |
+| `nearKm` | "Bands open from here" counts RBN/cluster spots whose spotter is within this distance of you (default 1500 km). |
 | `pskreporter.topics` | MQTT topics; `{CALL}` becomes your callsign. Default: who hears you. |
 | `rbn.addrs` | `telnet.reversebeacon.net:7000` is CW/RTTY skimmers, `:7001` is FT8/FT4. Both are on by default; drop one if you never use those modes. |
 | `wavelog` | Your Wavelog logbook (see above). |
@@ -143,7 +145,7 @@ It prints the newest QSOs, or exactly what went wrong (wrong URL, bad key, missi
 | `server/internal/geo`, `solar`, `spots` | Grids and cty.dat, NOAA, hub |
 | `web/src/panels/dedx.ts` | DE / DX box |
 | `web/src/panels/bandsummary.ts` | My signal |
-| `web/src/panels/dxspots.ts` | DX near you |
+| `web/src/panels/openings.ts` | Bands open from here |
 | `web/src/panels/qsos.ts` | Recent QSOs |
 | `server/internal/logbook` | Recent QSOs, Wavelog client, ADIF parser |
 | `web/src/panels/map.ts`, `web/src/world.ts` | The world map (canvas, equirectangular) and its outline loader |
@@ -155,7 +157,7 @@ To add a panel: write a class with `el` and `update(ctx)`, add it to `sideItems`
 
 - Azimuthal (great-circle) map centered on your QTH
 - Band predictions (VOACAP) from your QTH to the selected DX and to each continent
-- Flag new countries / band-slots in "DX near you" using Wavelog's lookup API
+- Flag new countries / band-slots using Wavelog's lookup API
 - Radio band/mode from flrig / Hamlib (rigctld) as an alternative to "on air" from spots
 - Rotator control from the DX bearing
 - Satellite passes, NCDXF beacons, contest and DXpedition calendars

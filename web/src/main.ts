@@ -7,7 +7,7 @@ import { TopBar } from "./panels/topbar.js";
 import { WorldMap, MAX_ZOOM_STEPS } from "./panels/map.js";
 import { DeDx } from "./panels/dedx.js";
 import { BandSummary } from "./panels/bandsummary.js";
-import { DXSpots } from "./panels/dxspots.js";
+import { Openings } from "./panels/openings.js";
 import { showSetup } from "./setup.js";
 import { QSOPanel } from "./panels/qsos.js";
 import { modeGroup } from "./bands.js";
@@ -66,13 +66,12 @@ async function main() {
   const dedx = new DeDx(cfg);
   const mySignal = new BandSummary("me", "My signal · who hears me",
     cfg.callsign ? "Nobody has reported you yet. Call CQ on FT8, or check RBN for CW." : 'Set "callsign" in config.json.');
-  let openDrawer: (section?: "dx") => void = () => {};
-  const dxSpots = new DXSpots(cfg, get, () => openDrawer("dx"));
+  const openings = new Openings(cfg);
   const qsoPanel = new QSOPanel(cfg);
 
   const side = document.getElementById("side")!;
   const sideItems: [Panel, keyof Settings["show"]][] = [
-    [dedx, "dedx"], [qsoPanel, "log"], [mySignal, "mySignal"], [dxSpots, "dxSpots"],
+    [dedx, "dedx"], [qsoPanel, "log"], [mySignal, "mySignal"], [openings, "openings"],
   ];
   for (const [p] of sideItems) side.append(p.el);
 
@@ -105,7 +104,7 @@ async function main() {
     applyShared(toSave as unknown as Settings);
     saveSettings(toSave as unknown as Settings);
   };
-  openDrawer = initDrawer(cfg, get, () => showSetup(cfg, false), commit);
+  initDrawer(cfg, get, () => showSetup(cfg, false), commit);
   initMapControls(get, commit);
 
   connectStream({
@@ -140,19 +139,23 @@ async function main() {
     tick(true);
   };
 
-  const panels: Panel[] = [topbar, map, ...sideItems.map(([p]) => p)];
-  let lastFull = 0;
+  // Calm display: the clock ticks every second; the map and panels redraw
+  // every few seconds (or right away when you change something).
+  const SLOW_MS = 5000;
+  const panels: Panel[] = [map, ...sideItems.map(([p]) => p)];
+  let lastTick = 0, lastSlow = 0;
   const tick = (force = false) => {
     const now = Date.now();
-    if (!force && now - lastFull < 1000) return;
-    lastFull = now;
+    if (!force && now - lastTick < 1000) return;
+    lastTick = now;
+    const slow = force || now - lastSlow >= SLOW_MS;
     store.prune(now);
 
     // Band/mode you're on, from your own spots; the display follows it.
-    const recent = store.filtered({ ...settings, maxAgeMin: Math.max(settings.maxAgeMin, 10) }, now, cfg);
+    const recent = store.filtered({ ...settings, maxAgeMin: Math.max(settings.maxAgeMin, 10) }, now);
     const onAir = onAirFrom(recent, now);
     const active = settings.followRadio && onAir ? { band: onAir.band, mode: onAir.mode } : undefined;
-    const spots = store.filtered(settings, now, cfg, active);
+    const spots = store.filtered(settings, now);
 
     // DX: a station you clicked (for a few minutes), else your last QSO.
     if (manual && now - manual.at > MANUAL_HOLD_MS) manual = undefined;
@@ -166,7 +169,7 @@ async function main() {
       now, spots, allCount: store.size, ratePerMin: store.ratePerMin,
       solar, connected, dx, select, qsos, wavelog, onAir, active,
     };
-    for (const p of panels) {
+    for (const p of slow ? [topbar, ...panels] : [topbar]) {
       if (p.el.hidden) continue;
       try {
         p.update(ctx);
@@ -174,6 +177,7 @@ async function main() {
         console.error("panel update failed", e);
       }
     }
+    if (slow) lastSlow = now;
   };
   setInterval(() => tick(), 250);
   tick(true);

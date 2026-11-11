@@ -1,19 +1,23 @@
 // User settings live in localStorage so each display (shack PC, wall TV,
 // tablet) can have its own layout while sharing one server.
+export const THEMES = [
+    { id: "dark", label: "Dark" }, { id: "ocean", label: "Ocean" }, { id: "slate", label: "Slate" },
+    { id: "amber", label: "Amber" }, { id: "phosphor", label: "Phosphor" }, { id: "night", label: "Night (red)" },
+    { id: "light", label: "Light" },
+];
 export const PRESETS = {
     balanced: { label: "Balanced", side: "right", size: "32rem" },
     map: { label: "Map only", side: "none", size: "0" },
     spots: { label: "Lists focus", side: "right", size: "48%" },
-    wall: { label: "Wall / TV", side: "bottom", size: "36%" },
+    wall: { label: "Wall / TV", side: "bottom", size: "32%" },
 };
 export const DEFAULTS = {
     preset: "balanced",
-    show: { clock: true, solar: true, dedx: true, mySignal: true, dxSpots: true, log: true, arcs: true, grayline: true },
+    show: { clock: true, solar: true, dedx: true, mySignal: true, openings: true, log: true, arcs: true, grayline: true },
     scale: 1,
     theme: "dark",
     maxAgeMin: 15,
     sources: { pskr: true, rbn: true, cluster: true, demo: true },
-    dx: { bands: [], modes: [], hideCountry: true, hideCont: false },
     followRadio: true,
     map: { zoom: 0, center: "home" },
 };
@@ -26,7 +30,6 @@ export function mergeSettings(saved) {
         ...d, ...saved,
         show: { ...d.show, ...saved.show },
         sources: Object.fromEntries(Object.keys(d.sources).map((k) => [k, saved.sources?.[k] ?? d.sources[k]])),
-        dx: { ...d.dx, ...saved.dx },
         map: { ...d.map, ...saved.map },
     };
 }
@@ -39,7 +42,7 @@ export function urlOverrides() {
     if (q.get("scale"))
         o.scale = Number(q.get("scale")) || 1;
     const theme = q.get("theme");
-    if (theme === "dark" || theme === "night" || theme === "light")
+    if (theme && THEMES.some((t) => t.id === theme))
         o.theme = theme;
     return o;
 }

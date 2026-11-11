@@ -2,7 +2,12 @@
 // tablet) can have its own layout while sharing one server.
 
 export type Preset = "balanced" | "map" | "spots" | "wall";
-export type Theme = "dark" | "night" | "light";
+export type Theme = "dark" | "ocean" | "slate" | "amber" | "phosphor" | "night" | "light";
+export const THEMES: { id: Theme; label: string }[] = [
+  { id: "dark", label: "Dark" }, { id: "ocean", label: "Ocean" }, { id: "slate", label: "Slate" },
+  { id: "amber", label: "Amber" }, { id: "phosphor", label: "Phosphor" }, { id: "night", label: "Night (red)" },
+  { id: "light", label: "Light" },
+];
 
 export interface Settings {
   preset: Preset;
@@ -11,7 +16,7 @@ export interface Settings {
     solar: boolean;
     dedx: boolean;
     mySignal: boolean;
-    dxSpots: boolean;
+    openings: boolean;
     log: boolean;
     arcs: boolean;
     grayline: boolean;
@@ -20,8 +25,7 @@ export interface Settings {
   theme: Theme;
   maxAgeMin: number;      // hide spots older than this
   sources: Record<string, boolean>;
-  dx: DXFilter;           // filters for "DX near you"
-  followRadio: boolean;   // follow the band/mode you're being spotted on
+  followRadio: boolean;   // fade other bands on the map while you're being spotted
   map: MapView;
 }
 
@@ -30,28 +34,21 @@ export interface MapView {
   center: "world" | "home";  // what to centre on when zoomed in
 }
 
-export interface DXFilter {
-  bands: string[];        // empty = all bands
-  modes: string[];        // mode groups; empty = all
-  hideCountry: boolean;   // hide stations in my own DXCC entity
-  hideCont: boolean;      // hide stations on my continent
-}
 
 export const PRESETS: Record<Preset, { label: string; side: "right" | "bottom" | "none"; size: string }> = {
   balanced: { label: "Balanced", side: "right", size: "32rem" },
   map: { label: "Map only", side: "none", size: "0" },
   spots: { label: "Lists focus", side: "right", size: "48%" },
-  wall: { label: "Wall / TV", side: "bottom", size: "36%" },
+  wall: { label: "Wall / TV", side: "bottom", size: "32%" },
 };
 
 export const DEFAULTS: Settings = {
   preset: "balanced",
-  show: { clock: true, solar: true, dedx: true, mySignal: true, dxSpots: true, log: true, arcs: true, grayline: true },
+  show: { clock: true, solar: true, dedx: true, mySignal: true, openings: true, log: true, arcs: true, grayline: true },
   scale: 1,
   theme: "dark",
   maxAgeMin: 15,
   sources: { pskr: true, rbn: true, cluster: true, demo: true },
-  dx: { bands: [], modes: [], hideCountry: true, hideCont: false },
   followRadio: true,
   map: { zoom: 0, center: "home" },
 };
@@ -64,7 +61,6 @@ export function mergeSettings(saved: Partial<Settings> | null | undefined): Sett
     ...d, ...saved,
     show: { ...d.show, ...saved.show },
     sources: Object.fromEntries(Object.keys(d.sources).map((k) => [k, saved.sources?.[k] ?? d.sources[k]])),
-    dx: { ...d.dx, ...saved.dx },
     map: { ...d.map, ...saved.map },
   };
 }
@@ -83,7 +79,7 @@ export function urlOverrides(): Override {
   if (preset && preset in PRESETS) o.preset = preset as Preset;
   if (q.get("scale")) o.scale = Number(q.get("scale")) || 1;
   const theme = q.get("theme");
-  if (theme === "dark" || theme === "night" || theme === "light") o.theme = theme;
+  if (theme && THEMES.some((t) => t.id === theme)) o.theme = theme as Theme;
   return o;
 }
 

@@ -1,7 +1,5 @@
 import type { Spot } from "./types.js";
 import type { Settings } from "./settings.js";
-import { modeGroup } from "./bands.js";
-import type { ServerConfig } from "./types.js";
 
 const HARD_MAX = 30000;
 const HARD_AGE_MS = 60 * 60 * 1000;
@@ -42,15 +40,15 @@ export class SpotStore {
   }
 
   /** Spots passing the user's filters, newest first. DX filters apply to "near" spots. */
-  filtered(s: Settings, now: number, cfg: ServerConfig, active?: { band: string; mode: string }): Spot[] {
+  filtered(s: Settings, now: number): Spot[] {
     const cut = now - s.maxAgeMin * 60_000;
+    const nearCut = now - 15 * 60_000; // "Bands open from here" always looks at 15 minutes
     const out: Spot[] = [];
     for (let i = this.spots.length - 1; i >= 0; i--) {
       const sp = this.spots[i];
-      if (sp.t < cut) continue;
+      if (sp.t < (sp.rel === "near" ? nearCut : cut)) continue;
       if (s.sources[sp.src] === false) continue;
       if (sp.rel === "here") continue; // only who hears me, and DX near me
-      if (sp.rel === "near" && !passesDX(sp, s, cfg, active)) continue;
       out.push(sp);
     }
     return out;
@@ -58,17 +56,3 @@ export class SpotStore {
 }
 
 
-/** Does a "near" spot pass the operator's DX filters? */
-export function passesDX(sp: Spot, s: Settings, cfg: ServerConfig, active?: { band: string; mode: string }): boolean {
-  const f = s.dx;
-  if (active) {
-    // Following the radio: show DX on the band and mode you're on right now.
-    if (sp.b !== active.band || modeGroup(sp.m) !== modeGroup(active.mode)) return false;
-  } else {
-    if (f.bands.length && !f.bands.includes(sp.b)) return false;
-    if (f.modes.length && !f.modes.includes(modeGroup(sp.m))) return false;
-  }
-  if (f.hideCountry && cfg.country && sp.dxc === cfg.country) return false;
-  if (f.hideCont && cfg.cont && sp.dxk === cfg.cont) return false;
-  return true;
-}

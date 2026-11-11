@@ -1,18 +1,17 @@
-import { BANDS, MODE_GROUPS, bandColor } from "./bands.js";
-import { PRESETS, type Preset, type Settings, type Theme } from "./settings.js";
+import { PRESETS, THEMES, type Preset, type Settings, type Theme } from "./settings.js";
 import type { ServerConfig } from "./types.js";
 
 /**
  * The settings drawer. Kept to one short screen: layout, panels, text size,
- * theme and the "DX near you" filters. Anything more belongs in config.json.
- * Returns a function that opens the drawer, optionally at the DX section.
+ * theme and map. Anything more belongs in config.json.
+ * Returns a function that opens the drawer.
  */
 export function initDrawer(
   cfg: ServerConfig,
   get: () => Settings,
   editStation: () => void,
   set: (s: Settings) => void,
-): (section?: "dx") => void {
+): () => void {
   const gear = document.getElementById("gear")!;
   const drawer = document.getElementById("drawer")!;
 
@@ -20,8 +19,6 @@ export function initDrawer(
     const s = get();
     const checkbox = (key: keyof Settings["show"], label: string) =>
       `<label class="check"><input type="checkbox" data-show="${key}" ${s.show[key] ? "checked" : ""}> ${label}</label>`;
-    const dxCheck = (key: "hideCountry" | "hideCont", label: string) =>
-      `<label class="check"><input type="checkbox" data-dx="${key}" ${s.dx[key] ? "checked" : ""}> ${label}</label>`;
     drawer.innerHTML = `
       <div class="drawer-head"><h2>Settings <span class="muted small">apply to every screen</span></h2><button class="close" aria-label="Close">✕</button></div>
       <button class="station">Station: <b>${cfg.callsign}</b> ${cfg.grid} · change…</button>
@@ -34,7 +31,7 @@ export function initDrawer(
       <div class="checks">
         ${checkbox("clock", "Clock")}${checkbox("solar", "Solar")}
         ${checkbox("dedx", "DE / DX")}${checkbox("mySignal", "My signal")}
-        ${checkbox("dxSpots", "DX near me")}${checkbox("log", "QSOs")}
+        ${checkbox("openings", "Bands open")}${checkbox("log", "QSOs")}
         ${checkbox("arcs", "Lines to stations hearing me")}
         ${checkbox("grayline", "Gray line")}
       </div>
@@ -54,25 +51,14 @@ export function initDrawer(
       <input type="range" min="0.7" max="2.5" step="0.05" value="${s.scale}" data-scale>
 
       <h3>Theme</h3>
-      <div class="seg">${(["dark", "night", "light"] as Theme[]).map((t) =>
-        `<button data-theme="${t}" class="${s.theme === t ? "on" : ""}">${t === "night" ? "Night (red)" : t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div>
+      <div class="seg">${THEMES.map((t) =>
+        `<button data-theme="${t.id}" class="${s.theme === t.id ? "on" : ""}">${t.label}</button>`).join("")}</div>
 
       <h3>Keep spots for</h3>
       <select data-age>${[5, 10, 15, 30, 60].map((m) => `<option value="${m}" ${s.maxAgeMin === m ? "selected" : ""}>${m} minutes</option>`).join("")}</select>
 
       <h3>On air</h3>
-      <label class="check"><input type="checkbox" data-follow ${s.followRadio ? "checked" : ""}> Follow my spots: show DX on the band and mode I'm being heard on, fade other bands on the map</label>
-
-      <h3 id="dx-filters">DX near me <span class="muted">${s.followRadio ? "(used when you haven't been spotted recently)" : ""}</span></h3>
-      <div class="chips">${Object.keys(MODE_GROUPS).map((m) =>
-        `<button data-mode="${m}" class="chip ${s.dx.modes.includes(m) ? "on" : ""}">${m}</button>`).join("")}</div>
-      <div class="chips">${BANDS.map((b) =>
-        `<button data-band="${b}" class="chip ${s.dx.bands.includes(b) ? "on" : ""}" style="--c:${bandColor(b)}">${b}</button>`).join("")}</div>
-      <p class="muted small">Pick the modes and bands you're working. Nothing selected means all of them.</p>
-      <div class="checks">
-        ${dxCheck("hideCountry", `Hide ${cfg.country ?? "my country"}`)}
-        ${dxCheck("hideCont", `Hide ${cfg.cont ? contName(cfg.cont) : "my continent"}`)}
-      </div>
+      <label class="check"><input type="checkbox" data-follow ${s.followRadio ? "checked" : ""}> Follow my spots: highlight the band I'm being heard on and fade other bands on the map</label>
 
       <h3>Sources</h3>
       <div class="checks">${Object.keys(s.sources).filter((k) => k !== "demo" || cfg.demo).map((k) =>
@@ -80,7 +66,6 @@ export function initDrawer(
     `;
   };
 
-  const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
   drawer.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
@@ -93,8 +78,6 @@ export function initDrawer(
       const z = t.dataset.mapzoom;
       s.map.zoom = z === "world" ? 0 : Math.max(0, Math.min(4, s.map.zoom + (z === "in" ? 0.5 : -0.5)));
     } else if (t.dataset.mapcenter) s.map.center = t.dataset.mapcenter as "home" | "world";
-    else if (t.dataset.band) s.dx.bands = toggle(s.dx.bands, t.dataset.band);
-    else if (t.dataset.mode) s.dx.modes = toggle(s.dx.modes, t.dataset.mode);
     else return;
     set(s);
     keepScroll(render);
@@ -104,7 +87,6 @@ export function initDrawer(
     const t = e.target as HTMLInputElement;
     const s = structuredClone(get());
     if (t.dataset.show) s.show[t.dataset.show as keyof Settings["show"]] = t.checked;
-    else if (t.dataset.dx) s.dx[t.dataset.dx as "hideCountry" | "hideCont"] = t.checked;
     else if ("follow" in t.dataset) { s.followRadio = t.checked; set(s); keepScroll(render); return; }
     else if (t.dataset.src) s.sources[t.dataset.src] = t.checked;
     else if ("age" in t.dataset) s.maxAgeMin = Number(t.value);
@@ -121,10 +103,9 @@ export function initDrawer(
     drawer.scrollTop = top;
   };
 
-  const open = (section?: "dx") => {
+  const open = () => {
     drawer.hidden = false;
     render();
-    if (section === "dx") drawer.querySelector("#dx-filters")?.scrollIntoView({ block: "start" });
   };
   gear.addEventListener("click", () => (drawer.hidden ? open() : (drawer.hidden = true)));
 
@@ -143,10 +124,6 @@ export function initDrawer(
   });
   wake();
   return open;
-}
-
-function contName(c: string): string {
-  return ({ NA: "North America", SA: "South America", EU: "Europe", AF: "Africa", AS: "Asia", OC: "Oceania", AN: "Antarctica" } as Record<string, string>)[c] ?? c;
 }
 
 function srcName(k: string): string {

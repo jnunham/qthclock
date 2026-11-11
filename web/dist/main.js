@@ -44,6 +44,11 @@ function onAirFrom(spots, now) {
     return best && { band: best.band, mode: best.mode, last: best.last, count: best.count };
 }
 async function main() {
+    window.qthclockStarted = true;
+    try {
+        sessionStorage.removeItem("qthclockRetry");
+    }
+    catch { /* ignore */ }
     const cfg = await fetch("api/config").then((r) => r.json());
     if (!cfg.configured && !cfg.demo) {
         await showSetup(cfg, true); // reloads the page once saved

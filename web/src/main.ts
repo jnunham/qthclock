@@ -45,6 +45,8 @@ function onAirFrom(spots: Spot[], now: number): OnAir | undefined {
 }
 
 async function main() {
+  (window as unknown as { qthclockStarted: boolean }).qthclockStarted = true;
+  try { sessionStorage.removeItem("qthclockRetry"); } catch { /* ignore */ }
   const cfg: ServerConfig = await fetch("api/config").then((r) => r.json());
   if (!cfg.configured && !cfg.demo) {
     await showSetup(cfg, true); // reloads the page once saved

@@ -5,6 +5,8 @@ export const THEMES = [
     { id: "amber", label: "Amber" }, { id: "phosphor", label: "Phosphor" }, { id: "night", label: "Night (red)" },
     { id: "light", label: "Light" },
 ];
+/** Bump when saved settings need a one-time fix-up (see mergeSettings). */
+export const SETTINGS_VERSION = 3;
 export const PRESETS = {
     balanced: { label: "Balanced", side: "right", size: "32rem" },
     map: { label: "Map only", side: "none", size: "0" },
@@ -12,6 +14,7 @@ export const PRESETS = {
     wall: { label: "Wall / TV", side: "bottom", size: "32%" },
 };
 export const DEFAULTS = {
+    v: SETTINGS_VERSION,
     preset: "balanced",
     show: { clock: true, solar: false, dedx: true, mySignal: true, openings: true, space: true, log: true, arcs: true, grayline: true },
     scale: 1,
@@ -27,12 +30,18 @@ export function mergeSettings(saved) {
     const d = structuredClone(DEFAULTS);
     if (!saved || typeof saved !== "object")
         return d;
-    return {
+    const merged = {
         ...d, ...saved,
         show: { ...d.show, ...saved.show },
         sources: Object.fromEntries(Object.keys(d.sources).map((k) => [k, saved.sources?.[k] ?? d.sources[k]])),
         map: { ...d.map, ...saved.map },
+        v: SETTINGS_VERSION,
     };
+    // Settings saved before version 3 may carry a zoom from testing: start
+    // from the whole world again.
+    if (!saved.v || saved.v < 3)
+        merged.map = { ...d.map };
+    return merged;
 }
 export function urlOverrides() {
     const q = new URLSearchParams(location.search);

@@ -9,7 +9,11 @@ export const THEMES: { id: Theme; label: string }[] = [
   { id: "light", label: "Light" },
 ];
 
+/** Bump when saved settings need a one-time fix-up (see mergeSettings). */
+export const SETTINGS_VERSION = 3;
+
 export interface Settings {
+  v: number;
   preset: Preset;
   show: {
     clock: boolean;
@@ -45,6 +49,7 @@ export const PRESETS: Record<Preset, { label: string; side: "right" | "bottom" |
 };
 
 export const DEFAULTS: Settings = {
+  v: SETTINGS_VERSION,
   preset: "balanced",
   show: { clock: true, solar: false, dedx: true, mySignal: true, openings: true, space: true, log: true, arcs: true, grayline: true },
   scale: 1,
@@ -60,12 +65,17 @@ export const DEFAULTS: Settings = {
 export function mergeSettings(saved: Partial<Settings> | null | undefined): Settings {
   const d = structuredClone(DEFAULTS);
   if (!saved || typeof saved !== "object") return d;
-  return {
+  const merged: Settings = {
     ...d, ...saved,
     show: { ...d.show, ...saved.show },
     sources: Object.fromEntries(Object.keys(d.sources).map((k) => [k, saved.sources?.[k] ?? d.sources[k]])),
     map: { ...d.map, ...saved.map },
+    v: SETTINGS_VERSION,
   };
+  // Settings saved before version 3 may carry a zoom from testing: start
+  // from the whole world again.
+  if (!saved.v || saved.v < 3) merged.map = { ...d.map };
+  return merged;
 }
 
 /**

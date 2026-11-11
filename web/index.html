@@ -24,5 +24,16 @@
   <button id="gear" title="Settings" aria-label="Settings">⚙</button>
   <div id="drawer" hidden></div>
   <script type="module" src="dist/main.js"></script>
+  <script>
+    // Safety net: if the app's code didn't start (e.g. a file failed to
+    // load), say so and retry instead of leaving a blank screen.
+    setTimeout(function () {
+      if (window.qthclockStarted) return;
+      var n = Number(sessionStorage.getItem("qthclockRetry") || 0);
+      document.getElementById("topbar").innerHTML =
+        '<div style="padding:0.5rem 1rem">QTHClock didn\'t start' + (n < 3 ? " — reloading…" : ". Press Ctrl+Shift+R to reload, or check that the QTHClock server is running.") + "</div>";
+      if (n < 3) { sessionStorage.setItem("qthclockRetry", n + 1); setTimeout(function () { location.reload(); }, 3000); }
+    }, 8000);
+  </script>
 </body>
 </html>

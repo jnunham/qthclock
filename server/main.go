@@ -149,7 +149,7 @@ func main() {
 		writeJSON(w, h)
 	})
 	mux.HandleFunc("GET /api/stream", func(w http.ResponseWriter, r *http.Request) { serveSSE(w, r, hub) })
-	mux.Handle("/", http.FileServer(http.Dir(cfg.WebDir)))
+	mux.Handle("/", newStatic(cfg.WebDir, boot))
 
 	srv := &http.Server{Addr: cfg.Listen, Handler: mux}
 	go func() {

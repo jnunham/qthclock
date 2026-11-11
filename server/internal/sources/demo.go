@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"qthclock/internal/geo"
@@ -22,6 +23,9 @@ type Demo struct {
 
 	OnStatus func(logbook.Working)
 	OnLogged func(logbook.QSO)
+
+	mu   sync.Mutex
+	band string // band the demo radio is on; "who hears me" favours it
 }
 
 var demoStations = []struct{ call, grid, country, cont string }{
@@ -83,8 +87,16 @@ func (d *Demo) Run(ctx context.Context) {
 		other := demoStations[rand.Intn(len(demoStations))]
 		s := spots.Spot{FreqKHz: b.f + rand.Float64()*2.5, Band: b.band, Mode: b.mode, SNR: spots.I(rand.Intn(40) - 22)}
 		switch k := rand.Intn(10); {
-		case k < 4: // someone hears me
+		case k < 4: // someone hears me, mostly on the band the radio is on
 			s.Source, s.DX, s.DXGrid, s.DE, s.DEGrid = "pskr", d.Call, d.Grid, other.call, other.grid
+			d.mu.Lock()
+			cur := d.band
+			d.mu.Unlock()
+			for _, x := range demoBands {
+				if x.band == cur && x.mode == "FT8" && rand.Intn(3) > 0 {
+					s.Band, s.Mode, s.FreqKHz = x.band, x.mode, x.f+rand.Float64()*2.5
+				}
+			}
 			if b.mode == "CW" {
 				s.Source = "rbn"
 			}
@@ -131,11 +143,21 @@ func (d *Demo) qsoLoop(ctx context.Context) {
 		d.OnLogged(logbook.QSO{Call: o.call, Grid: o.grid, Country: o.country, Time: now.Add(-time.Duration(i*4) * time.Minute).UnixMilli(),
 			Band: "20m", Mode: "FT8", RSTSent: snrStr(), RSTRcvd: snrStr(), Source: "wsjtx"})
 	}
-	for {
+	// The demo radio changes band every few QSOs, so the display's
+	// follow-the-radio behaviour can be seen.
+	dials := []struct {
+		band string
+		f    float64
+	}{{"20m", 14074}, {"40m", 7074}, {"15m", 21074}, {"17m", 18100}}
+	for n := 0; ; n++ {
+		dial := dials[(n/3)%len(dials)]
+		d.mu.Lock()
+		d.band = dial.band
+		d.mu.Unlock()
 		o := demoStations[rand.Intn(len(demoStations))]
 		start := time.Now()
 		for p := 0; p < 4; p++ {
-			w := logbook.Working{Call: o.call, Grid: o.grid, FreqKHz: 14074, Mode: "FT8", Report: snrStr(), TxEnabled: true,
+			w := logbook.Working{Call: o.call, Grid: o.grid, FreqKHz: dial.f, Band: dial.band, Mode: "FT8", Report: snrStr(), TxEnabled: true,
 				Transmitting: p%2 == 0, Updated: time.Now().UnixMilli()}
 			if la, lo, ok := geo.GridToLatLon(o.grid); ok {
 				w.Lat, w.Lon = spots.F(la), spots.F(lo)
@@ -147,9 +169,9 @@ func (d *Demo) qsoLoop(ctx context.Context) {
 			case <-time.After(10 * time.Second):
 			}
 		}
-		d.OnLogged(logbook.QSO{Call: o.call, Grid: o.grid, Country: o.country, Time: start.UnixMilli(), Band: "20m", Mode: "FT8",
+		d.OnLogged(logbook.QSO{Call: o.call, Grid: o.grid, Country: o.country, Time: start.UnixMilli(), Band: dial.band, Mode: "FT8",
 			RSTSent: snrStr(), RSTRcvd: snrStr(), Source: "wsjtx"})
-		d.OnStatus(logbook.Working{FreqKHz: 14074, Mode: "FT8", Updated: time.Now().UnixMilli()})
+		d.OnStatus(logbook.Working{FreqKHz: dial.f, Band: dial.band, Mode: "FT8", Updated: time.Now().UnixMilli()})
 		select {
 		case <-ctx.Done():
 			return

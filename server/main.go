@@ -68,11 +68,16 @@ func main() {
 		})
 	}
 
+	display := newDisplaySettings(cfg.DataDir, hub)
+	boot := time.Now().UnixMilli() // lets open screens notice a restart and reload new code
+
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/settings", display.get)
+	mux.HandleFunc("PUT /api/settings", display.put)
 	mux.HandleFunc("GET /api/config", func(w http.ResponseWriter, r *http.Request) {
 		c := st.config()
 		out := map[string]any{"callsign": c.Callsign, "grid": c.Grid, "mapStyle": c.MapStyle,
-			"demo": c.Demo.Enabled, "nearKm": c.NearKm, "configured": c.configured()}
+			"demo": c.Demo.Enabled, "nearKm": c.NearKm, "configured": c.configured(), "boot": boot}
 		if la, lo, ok := geo.GridToLatLon(c.Grid); ok {
 			out["lat"], out["lon"] = la, lo
 		}

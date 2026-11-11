@@ -37,7 +37,7 @@ export class SpotStore {
         return this.arrivals.length;
     }
     /** Spots passing the user's filters, newest first. DX filters apply to "near" spots. */
-    filtered(s, now, cfg) {
+    filtered(s, now, cfg, active) {
         const cut = now - s.maxAgeMin * 60_000;
         const out = [];
         for (let i = this.spots.length - 1; i >= 0; i--) {
@@ -48,7 +48,7 @@ export class SpotStore {
                 continue;
             if (sp.rel === "here" && !s.show.heardHere)
                 continue;
-            if (sp.rel === "near" && !passesDX(sp, s, cfg))
+            if (sp.rel === "near" && !passesDX(sp, s, cfg, active))
                 continue;
             out.push(sp);
         }
@@ -56,12 +56,19 @@ export class SpotStore {
     }
 }
 /** Does a "near" spot pass the operator's DX filters? */
-export function passesDX(sp, s, cfg) {
+export function passesDX(sp, s, cfg, active) {
     const f = s.dx;
-    if (f.bands.length && !f.bands.includes(sp.b))
-        return false;
-    if (f.modes.length && !f.modes.includes(modeGroup(sp.m)))
-        return false;
+    if (active) {
+        // Following the radio: show DX on the band and mode you're on right now.
+        if (sp.b !== active.band || modeGroup(sp.m) !== modeGroup(active.mode))
+            return false;
+    }
+    else {
+        if (f.bands.length && !f.bands.includes(sp.b))
+            return false;
+        if (f.modes.length && !f.modes.includes(modeGroup(sp.m)))
+            return false;
+    }
     if (f.hideCountry && cfg.country && sp.dxc === cfg.country)
         return false;
     if (f.hideCont && cfg.cont && sp.dxk === cfg.cont)

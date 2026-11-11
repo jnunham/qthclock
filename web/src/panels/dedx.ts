@@ -27,7 +27,7 @@ export class DeDx implements Panel {
       ? `<div class="kv"><span>${cfg.grid}</span><span class="muted">${sunLine(de.lat, de.lon)}</span></div>`
       : `<div class="muted">Set "grid" in config.json</div>`;
 
-    let dxHtml = `<div class="muted hint">Click a station on the map or in a list</div>`;
+    let dxHtml = `<div class="muted hint">Shows the station you're working, or the farthest one hearing you</div>`;
     const dx = ctx.dx;
     if (dx) {
       const loc = approxLocal(ctx.now, dx.lon);
@@ -56,7 +56,8 @@ export class DeDx implements Panel {
         ${deHtml}
       </div>
       <div class="col">
-        <h2>DX ${ctx.working?.call && dx?.call === ctx.working.call ? '<span class="workbadge">working now</span>' : ""} ${dx ? '<button class="clear" title="Clear">✕</button>' : ""}</h2>
+        <h2>DX ${dx?.reason === "working" ? '<span class="workbadge">working now</span>'
+          : dx?.reason === "auto" ? '<span class="autobadge">farthest hearing you</span>' : ""} ${dx?.reason === "manual" ? '<button class="clear" title="Back to automatic">✕</button>' : ""}</h2>
         <div class="big">${dx ? dx.call : "—"}</div>
         ${dxHtml}
       </div>`;

@@ -18,6 +18,7 @@ export function connectStream(h) {
     es.addEventListener("solar", parse(h.solar));
     es.addEventListener("working", parse(h.working));
     es.addEventListener("qsos", parse(h.qsos));
+    es.addEventListener("settings", parse(h.settings));
     es.onopen = () => h.status(true);
     es.onerror = () => h.status(false);
     return es;

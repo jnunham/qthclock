@@ -28,12 +28,13 @@ interface Dot { lon: number; lat: number; color: string; op: number; kind: "me" 
  *  - "here": a path from each station I hear to my QTH, dot at that station
  *  - "near": just a ring at the DX (no path; it was heard by someone near me)
  */
-function buildGeometry(spots: Spot[], now: number, maxAgeMin: number, arcs: boolean, home?: { lat: number; lon: number }) {
+function buildGeometry(spots: Spot[], now: number, maxAgeMin: number, arcs: boolean, home?: { lat: number; lon: number }, activeBand?: string) {
   const span = maxAgeMin * 60_000;
   const lines: Arc[] = [];
   const dots = new Map<string, Dot>();
   for (const s of spots) {
-    const op = Math.max(0.2, 1 - (now - s.t) / span);
+    // Fade with age; when following the radio, other bands fade into the background.
+    const op = Math.max(0.2, 1 - (now - s.t) / span) * (activeBand && s.b !== activeBand ? 0.22 : 1);
     const color = bandColor(s.b);
     const far = s.rel === "me" ? { call: s.de, lat: s.dela, lon: s.delo, grid: s.deg } : { call: s.dx, lat: s.dxla, lon: s.dxlo, grid: s.dxg };
     if (far.lat == null || far.lon == null) continue;
@@ -143,7 +144,7 @@ class LiveMap implements Panel {
     if (ctx.now - this.lastDraw < REDRAW_MS) return;
     this.lastDraw = ctx.now;
     const home = this.cfg.lat != null && this.cfg.lon != null ? { lat: this.cfg.lat, lon: this.cfg.lon } : undefined;
-    const g = buildGeometry(ctx.spots, ctx.now, s.maxAgeMin, s.show.arcs, home);
+    const g = buildGeometry(ctx.spots, ctx.now, s.maxAgeMin, s.show.arcs, home, ctx.active?.band);
     this.dots = g.dots;
     this.map.getSource("arcs").setData({
       type: "FeatureCollection",
@@ -234,7 +235,7 @@ class CanvasMap implements Panel {
     };
 
     const home = this.cfg.lat != null && this.cfg.lon != null ? { lat: this.cfg.lat, lon: this.cfg.lon } : undefined;
-    const g = buildGeometry(ctx.spots, ctx.now, s.maxAgeMin, s.show.arcs, home);
+    const g = buildGeometry(ctx.spots, ctx.now, s.maxAgeMin, s.show.arcs, home, ctx.active?.band);
     c.save();
     c.beginPath(); c.rect(ox, oy, ww, wh); c.clip();
     c.lineWidth = 1.2;

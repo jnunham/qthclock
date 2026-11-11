@@ -1,5 +1,6 @@
 import type { Panel, ServerConfig, Solar, UpdateContext } from "../types.js";
 import type { Settings } from "../settings.js";
+import { bandColor } from "../bands.js";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -10,6 +11,7 @@ export class TopBar implements Panel {
   private local: HTMLElement;
   private solar: HTMLElement;
   private status: HTMLElement;
+  private radio: HTMLElement;
 
   constructor(el: HTMLElement, cfg: ServerConfig, private settings: () => Settings) {
     this.el = el;
@@ -22,12 +24,14 @@ export class TopBar implements Panel {
         <div class="utc"></div>
         <div class="local muted"></div>
       </div>
+      <div class="radio"></div>
       <div class="solar"></div>
       <div class="status"></div>`;
     this.utc = el.querySelector(".utc")!;
     this.local = el.querySelector(".local")!;
     this.solar = el.querySelector(".solar")!;
     this.status = el.querySelector(".status")!;
+    this.radio = el.querySelector(".radio")!;
   }
 
   update(ctx: UpdateContext): void {
@@ -40,13 +44,20 @@ export class TopBar implements Panel {
       d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }) +
       " · local " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
+    const r = ctx.working;
+    this.radio.innerHTML = r
+      ? `<span class="band" style="--c:${bandColor(r.b)}">${r.b || "—"}</span>
+         <span class="rmode">${r.m}</span>
+         <span class="rfreq muted">${(r.f / 1000).toFixed(3)} MHz</span>
+         <span class="txrx ${r.tx ? "tx" : ""}">${r.tx ? "TX" : "RX"}</span>`
+      : `<span class="muted">Radio idle</span>`;
+    this.radio.title = r ? "Band and mode from WSJT-X" : "Waiting for WSJT-X (Settings › Reporting › UDP Server)";
     this.solar.hidden = !s.show.solar;
     this.solar.innerHTML = renderSolar(ctx.solar);
 
     this.status.innerHTML = `
       <span class="dot ${ctx.connected ? "ok" : "bad"}"></span>
       <span>${ctx.connected ? "Live" : "Reconnecting…"}</span>
-      ${ctx.working?.tx ? '<span class="txbadge">TX</span>' : ""}
       <span class="muted">${count(ctx, "me")} stations hear you</span>`;
   }
 }

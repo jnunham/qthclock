@@ -23,7 +23,7 @@ export function initDrawer(
     const dxCheck = (key: "hideCountry" | "hideCont", label: string) =>
       `<label class="check"><input type="checkbox" data-dx="${key}" ${s.dx[key] ? "checked" : ""}> ${label}</label>`;
     drawer.innerHTML = `
-      <div class="drawer-head"><h2>Settings</h2><button class="close" aria-label="Close">✕</button></div>
+      <div class="drawer-head"><h2>Settings <span class="muted small">apply to every screen</span></h2><button class="close" aria-label="Close">✕</button></div>
       <button class="station">Station: <b>${cfg.callsign}</b> ${cfg.grid} · change…</button>
 
       <h3>Layout</h3>
@@ -50,7 +50,10 @@ export function initDrawer(
       <h3>Keep spots for</h3>
       <select data-age>${[5, 10, 15, 30, 60].map((m) => `<option value="${m}" ${s.maxAgeMin === m ? "selected" : ""}>${m} minutes</option>`).join("")}</select>
 
-      <h3 id="dx-filters">DX near me</h3>
+      <h3>Radio</h3>
+      <label class="check"><input type="checkbox" data-follow ${s.followRadio ? "checked" : ""}> Follow WSJT-X: show DX on my current band and mode, fade other bands on the map</label>
+
+      <h3 id="dx-filters">DX near me <span class="muted">${s.followRadio ? "(used when the radio is idle)" : ""}</span></h3>
       <div class="chips">${Object.keys(MODE_GROUPS).map((m) =>
         `<button data-mode="${m}" class="chip ${s.dx.modes.includes(m) ? "on" : ""}">${m}</button>`).join("")}</div>
       <div class="chips">${BANDS.map((b) =>
@@ -89,6 +92,7 @@ export function initDrawer(
     if (t.dataset.show) s.show[t.dataset.show as keyof Settings["show"]] = t.checked;
     else if (t.dataset.dx) s.dx[t.dataset.dx as "hideCountry" | "hideCont"] = t.checked;
     else if ("globe" in t.dataset) s.globe = t.checked;
+    else if ("follow" in t.dataset) { s.followRadio = t.checked; set(s); keepScroll(render); return; }
     else if (t.dataset.src) s.sources[t.dataset.src] = t.checked;
     else if ("age" in t.dataset) s.maxAgeMin = Number(t.value);
     else if ("scale" in t.dataset) {

@@ -48,6 +48,36 @@ Install Go 1.22+ from https://go.dev/dl/, then run `make run` (or, without make:
 
 Press **s**, or click the gear, for layout, text size, theme and filters. Kiosk example: `http://pi:8073/?preset=wall&scale=1.6&theme=night`.
 
+### Hands-off operation (wall monitor)
+
+QTHClock is built to run on a screen nobody touches:
+
+- **It follows the radio.** WSJT-X sends QTHClock your dial frequency and mode, and the top bar shows your current band, mode, frequency and TX/RX. While WSJT-X is running, "DX near you" shows only your current band and mode, the map fades the other bands, and "My signal" highlights your band. When WSJT-X is closed, the DX list goes back to your saved filters. To turn this off, untick Settings › Radio › Follow WSJT-X.
+- **It picks the DX for you.** The DX box shows the station you're working. Between QSOs it shows the farthest station hearing you on your current band, re-checked every 30 seconds. If you click a station, it stays selected for 3 minutes, then automatic selection resumes.
+- **You control it from any other device.** Open `http://<pi-address>:8073` on your phone or laptop and change settings there; the monitor updates instantly. Settings are stored on the server (`data/display.json`), not in one browser.
+- **It updates itself.** After a `git pull` and restart, open screens reload the new version automatically.
+- **Per-screen tweaks** go in the URL and only affect that screen, e.g. `http://localhost:8073/?scale=1.3&preset=balanced`.
+
+#### Start everything at boot (Raspberry Pi)
+
+Run QTHClock as a service:
+
+```sh
+make build
+mkdir -p ~/.config/systemd/user
+cp scripts/qthclock.service ~/.config/systemd/user/
+systemctl --user enable --now qthclock
+sudo loginctl enable-linger $USER
+```
+
+Open the display full-screen at login. On Raspberry Pi OS Bookworm (labwc desktop), add this line to `~/.config/labwc/autostart`:
+
+```sh
+chromium-browser --kiosk --noerrdialogs --disable-infobars --password-store=basic http://localhost:8073 &
+```
+
+On older Pi OS (X11/LXDE), put the same command in `~/.config/lxsession/LXDE-pi/autostart` with an `@` in front of it instead.
+
 ### Wavelog
 
 To show your latest QSOs from Wavelog, edit the `wavelog` section of `config.json` and restart:

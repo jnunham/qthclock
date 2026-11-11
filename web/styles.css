@@ -237,3 +237,14 @@ body.idle, body.idle * { cursor: none; }
 .qsos .name { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; }
 .workbadge { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--poor); font-size: 0.75rem; margin-left: auto; margin-right: 0.5rem; }
 #drawer .station b { font-weight: 700; }
+
+/* Radio block in the top bar */
+.radio { display: flex; align-items: center; gap: 0.7rem; padding: 0.3rem 0.9rem; border-radius: 0.6rem; background: var(--panel-2); }
+.radio .band { font-size: 1.9rem; font-weight: 800; color: var(--c); letter-spacing: 0.02em; line-height: 1; }
+.radio .rmode { font-size: 1.3rem; font-weight: 600; }
+.radio .rfreq { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.radio .txrx { font-size: 0.8rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 0.3rem; background: var(--line); color: var(--muted); }
+.radio .txrx.tx { background: var(--poor); color: #fff; animation: pulse 1s ease-in-out infinite alternate; }
+.srow.cur { outline: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.autobadge { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--muted); font-size: 0.75rem; margin-left: auto; margin-right: 0.5rem; }
+#drawer h2 .small { font-weight: 400; margin-left: 0.4rem; }

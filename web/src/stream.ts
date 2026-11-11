@@ -6,6 +6,7 @@ export interface StreamHandlers {
   solar(s: Solar): void;
   working(w: Working): void;
   qsos(q: QSO[]): void;
+  settings(s: unknown): void;
   status(connected: boolean): void;
 }
 
@@ -28,6 +29,7 @@ export function connectStream(h: StreamHandlers): EventSource {
   es.addEventListener("solar", parse<Solar>(h.solar));
   es.addEventListener("working", parse<Working>(h.working));
   es.addEventListener("qsos", parse<QSO[]>(h.qsos));
+  es.addEventListener("settings", parse<unknown>(h.settings));
   es.onopen = () => h.status(true);
   es.onerror = () => h.status(false);
   return es;

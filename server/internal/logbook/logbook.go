@@ -28,7 +28,8 @@ type Working struct {
 	Grid         string   `json:"grid,omitempty"`
 	Lat          *float64 `json:"lat,omitempty"`
 	Lon          *float64 `json:"lon,omitempty"`
-	FreqKHz      float64  `json:"f"`
+	FreqKHz      float64  `json:"f"` // dial frequency
+	Band         string   `json:"b"`
 	Mode         string   `json:"m"`
 	Report       string   `json:"report,omitempty"` // report I'm sending
 	TxEnabled    bool     `json:"txEnabled"`

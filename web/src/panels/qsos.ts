@@ -29,11 +29,11 @@ export class QSOPanel implements Panel {
           <span class="call">${w.call}</span>
           <span class="muted">${w.grid ?? ""}</span>
           <span class="spacer"></span>
-          <span>${w.f.toFixed(3)} ${w.m}</span>
+          <span>${(w.f / 1000).toFixed(3)} MHz ${w.m}</span>
           ${w.report ? `<span class="muted">sent ${w.report}</span>` : ""}
         </div>`;
     } else if (w) {
-      this.now.innerHTML = `<div class="working idle"><span class="badge">RX</span><span class="muted">Not in a QSO · ${w.f.toFixed(3)} ${w.m}</span></div>`;
+      this.now.innerHTML = `<div class="working idle"><span class="badge">RX</span><span class="muted">Not in a QSO · ${(w.f / 1000).toFixed(3)} MHz ${w.m}</span></div>`;
     } else {
       this.now.innerHTML = "";
     }

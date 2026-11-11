@@ -176,6 +176,7 @@ func (w *WSJTX) status(st logbook.Working) {
 		return
 	}
 	st.Updated = now
+	st.Band = spots.BandForKHz(st.FreqKHz)
 	w.last = st
 	w.mu.Unlock()
 	if st.Call != "" {

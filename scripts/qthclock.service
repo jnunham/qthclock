@@ -1,0 +1,17 @@
+# systemd user service: starts QTHClock at boot and restarts it if it stops.
+#   mkdir -p ~/.config/systemd/user
+#   cp scripts/qthclock.service ~/.config/systemd/user/
+#   systemctl --user enable --now qthclock
+#   sudo loginctl enable-linger $USER     # start at boot, even before you log in
+[Unit]
+Description=QTHClock shack display
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/qthclock
+ExecStart=%h/qthclock/qthclock -config config.json
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

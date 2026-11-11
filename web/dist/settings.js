@@ -15,36 +15,47 @@ export const DEFAULTS = {
     maxAgeMin: 15,
     sources: { pskr: true, wsjtx: true, rbn: true, cluster: true, demo: true },
     dx: { bands: [], modes: [], hideCountry: true, hideCont: false },
+    followRadio: true,
 };
-const KEY = "qthclock.settings.v2";
-export function loadSettings() {
-    let s = structuredClone(DEFAULTS);
-    try {
-        const raw = localStorage.getItem(KEY);
-        if (raw) {
-            const saved = JSON.parse(raw);
-            s = { ...s, ...saved, show: { ...s.show, ...saved.show }, sources: { ...s.sources, ...saved.sources }, dx: { ...s.dx, ...saved.dx } };
-        }
-    }
-    catch {
-        /* storage unavailable or corrupt: fall back to defaults */
-    }
-    // URL overrides make kiosk setups easy: /?preset=wall&scale=1.5&theme=night
-    const q = new URLSearchParams(location.search);
-    if (q.get("preset") && q.get("preset") in PRESETS)
-        s.preset = q.get("preset");
-    if (q.get("scale"))
-        s.scale = Number(q.get("scale")) || 1;
-    if (q.get("theme"))
-        s.theme = q.get("theme");
-    return s;
+/** Fill in anything missing from saved settings with defaults. */
+export function mergeSettings(saved) {
+    const d = structuredClone(DEFAULTS);
+    if (!saved || typeof saved !== "object")
+        return d;
+    return {
+        ...d, ...saved,
+        show: { ...d.show, ...saved.show },
+        sources: { ...d.sources, ...saved.sources },
+        dx: { ...d.dx, ...saved.dx },
+    };
 }
-export function saveSettings(s) {
+export function urlOverrides() {
+    const q = new URLSearchParams(location.search);
+    const o = {};
+    const preset = q.get("preset");
+    if (preset && preset in PRESETS)
+        o.preset = preset;
+    if (q.get("scale"))
+        o.scale = Number(q.get("scale")) || 1;
+    const theme = q.get("theme");
+    if (theme === "dark" || theme === "night" || theme === "light")
+        o.theme = theme;
+    return o;
+}
+export async function fetchSettings() {
     try {
-        localStorage.setItem(KEY, JSON.stringify(s));
+        return mergeSettings(await fetch("api/settings").then((r) => r.json()));
     }
     catch {
-        /* ignore */
+        return mergeSettings(null);
+    }
+}
+export async function saveSettings(s) {
+    try {
+        await fetch("api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(s) });
+    }
+    catch {
+        /* server unreachable: the change still applies on this screen */
     }
 }
 //# sourceMappingURL=settings.js.map

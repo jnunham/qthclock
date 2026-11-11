@@ -10,7 +10,7 @@ const NEED = { dedx: 10, log: 11, mySignal: 15, openings: 14, space: 26 };
  *  - wall:     map on top with space weather in a tall column beside it,
  *              the other panels in one row underneath
  *  - balanced: map on the left with panels beside it in one or two columns;
- *              on screens where that makes the map too tall, "Bands open"
+ *              on screens where that makes the map too tall, "Band openings"
  *              and "Space weather" move underneath the map
  *  - spots:    like balanced with wider panel columns
  *  - map:      the map only
@@ -73,7 +73,7 @@ export function gridFor(preset, visible, W, H, rem) {
             continue;
         candidates.push({ grid: stacked(cols, visible), waste: waste(mapW, H) + crowding(split(cols, visible)) });
     }
-    // C) side column for live info, "Bands open" + "Space weather" under the map.
+    // C) side column for live info, "Band openings" + "Space weather" under the map.
     const under = visible.filter((id) => id === "openings" || id === "space");
     const beside = visible.filter((id) => !under.includes(id));
     if (under.length && beside.length) {

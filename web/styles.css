@@ -110,7 +110,8 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; ov
 #side > .panel { min-height: 0; min-width: 0; overflow: hidden; }
 #map-wrap { flex: 1; min-width: 0; min-height: 0; position: relative; padding: 0; overflow: hidden; }
 #map { position: absolute; inset: 0; }
-#map canvas { display: block; }
+/* The canvas has devicePixelRatio× pixels for sharpness; CSS keeps it the panel's size. */
+#map canvas { display: block; width: 100%; height: 100%; }
 
 .panel {
   background: var(--panel); border: 1px solid var(--line); border-radius: 0.6rem;

@@ -22,20 +22,35 @@ const lvl = (v: number | undefined, good: (v: number) => boolean, fair: (v: numb
  */
 export class SpaceWeather implements Panel {
   el: HTMLElement;
-  private lastKey = "";
+  private parts: { stats: HTMLElement; status: HTMLElement; kp: HTMLElement; img: HTMLImageElement; wait: HTMLElement };
+  private last = { stats: "", status: "", kp: "" };
+  private auroraVersion = 0;
 
   constructor() {
     this.el = document.createElement("section");
     this.el.className = "panel space";
+    // Built once; updates only touch the parts that changed, so the aurora
+    // image is never torn down and redrawn.
+    this.el.innerHTML = `
+      <h2>Space weather</h2>
+      <div class="sw-stats"></div>
+      <div class="sw-status"></div>
+      <div class="sw-charts">
+        <figure class="sw-aurora">
+          <div class="muted hint sw-wait">Aurora forecast loading…</div>
+          <img alt="NOAA aurora oval forecast" hidden>
+          <figcaption>Auroral oval forecast</figcaption>
+        </figure>
+        <figure class="sw-kp"><div class="sw-kpchart"></div><figcaption>Kp, last 24 h</figcaption></figure>
+      </div>`;
+    const q = <T extends HTMLElement>(sel: string) => this.el.querySelector<T>(sel)!;
+    this.parts = { stats: q(".sw-stats"), status: q(".sw-status"), kp: q(".sw-kpchart"), img: q<HTMLImageElement>(".sw-aurora img"), wait: q(".sw-wait") };
   }
 
   update(ctx: UpdateContext): void {
     const s = ctx.solar;
-    const key = JSON.stringify(s ?? null);
-    if (key === this.lastKey) return; // only redraw when the data changed
-    this.lastKey = key;
     if (!s || !s.updated) {
-      this.el.innerHTML = `<h2>Space weather</h2><div class="muted hint">Waiting for NOAA space weather data…</div>`;
+      this.set("stats", `<div class="muted hint">Waiting for NOAA space weather data…</div>`);
       return;
     }
     const f = (v: number | undefined, d = 0) => (v == null ? "—" : v.toFixed(d));
@@ -45,30 +60,40 @@ export class SpaceWeather implements Panel {
     const past = s.kpMax24 != null ? kpStatus(s.kpMax24) : undefined;
     const xLevel = !s.xray ? "" : /^[XM]/.test(s.xray) ? "poor" : /^C/.test(s.xray) ? "fair" : "good";
 
-    this.el.innerHTML = `
-      <h2>Space weather</h2>
-      <div class="sw-stats">
+    this.set("stats", `
         ${stat("SFI", f(s.sfi), lvl(s.sfi, (v) => v >= 150, (v) => v >= 90), "10.7 cm solar flux: higher means better HF above 20 m")}
         ${stat("Kp", f(s.kp, 2), lvl(s.kp, (v) => v < 3, (v) => v < 5), "Planetary K index (estimated, latest)")}
         ${stat("A", f(s.a), lvl(s.a, (v) => v < 20, (v) => v < 30), "Estimated planetary A index for today (UTC)")}
         ${stat("X-ray", s.xray ?? "—", xLevel, "GOES X-ray class: M/X flares can black out sunlit HF paths")}
         ${stat("N HPI", s.hpiN != null ? `${f(s.hpiN)}<small>GW</small>` : "—", lvl(s.hpiN, (v) => v < 25, (v) => v < 60), "Northern hemispheric power: auroral energy input")}
-        ${stat("S HPI", s.hpiS != null ? `${f(s.hpiS)}<small>GW</small>` : "—", lvl(s.hpiS, (v) => v < 25, (v) => v < 60), "Southern hemispheric power")}
-      </div>
-      <div class="sw-status">
+        ${stat("S HPI", s.hpiS != null ? `${f(s.hpiS)}<small>GW</small>` : "—", lvl(s.hpiS, (v) => v < 25, (v) => v < 60), "Southern hemispheric power")}`);
+    this.set("status", `
         ${now ? `<div class="pill ${now.level}"><i></i>Currently: ${now.text}</div>` : ""}
-        ${past ? `<div class="pill ${past.level}"><i></i>Past 24 hours: ${past.text}</div>` : ""}
-      </div>
-      <div class="sw-charts">
-        <figure class="sw-aurora">
-          ${s.aurora ? `<img src="api/aurora.jpg?t=${s.aurora}" alt="NOAA aurora oval forecast">` : `<div class="muted hint">Aurora forecast loading…</div>`}
-          <figcaption>Auroral oval forecast</figcaption>
-        </figure>
-        <figure class="sw-kp">
-          ${kpChart(s)}
-          <figcaption>Kp, last 24 h</figcaption>
-        </figure>
-      </div>`;
+        ${past ? `<div class="pill ${past.level}"><i></i>Past 24 hours: ${past.text}</div>` : ""}`);
+    this.set("kp", kpChart(s));
+
+    // Aurora image: load the new one fully in the background, then swap,
+    // so the screen never shows a half-drawn picture.
+    if (s.aurora && s.aurora !== this.auroraVersion) {
+      const version = s.aurora;
+      this.auroraVersion = version;
+      const next = new Image();
+      next.src = `api/aurora.jpg?t=${version}`;
+      next.decode().then(() => {
+        if (this.auroraVersion !== version) return; // a newer one is already on its way
+        this.parts.img.src = next.src;
+        this.parts.img.hidden = false;
+        this.parts.wait.hidden = true;
+      }).catch(() => {
+        this.auroraVersion = 0; // try again on the next update
+      });
+    }
+  }
+
+  private set(part: "stats" | "status" | "kp", html: string) {
+    if (this.last[part] === html) return;
+    this.last[part] = html;
+    this.parts[part].innerHTML = html;
   }
 }
 

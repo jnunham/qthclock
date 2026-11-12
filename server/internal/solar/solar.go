@@ -103,6 +103,12 @@ func NewPoller(south bool) *Poller {
 		{name: "hpi", path: "text/aurora-nowcast-hemi-power.txt", every: 10 * time.Minute, apply: applyHPI},
 		{name: "xray", path: "json/goes/primary/xrays-6-hour.json", every: 10 * time.Minute, apply: applyXray},
 		{name: "aurora", path: p.Aurora.path, every: 15 * time.Minute, apply: func(r *Report, b []byte) error {
+			// NOAA overwrites this file every few minutes; a download caught
+			// mid-write is cut off. Keep the previous image unless this one
+			// is a complete JPEG.
+			if !completeJPEG(b) {
+				return fmt.Errorf("incomplete aurora image (%d bytes); keeping the previous one", len(b))
+			}
 			p.Aurora.mu.Lock()
 			p.Aurora.img, p.Aurora.at = b, time.Now()
 			p.Aurora.mu.Unlock()
@@ -142,6 +148,10 @@ func (p *Poller) Run(ctx context.Context, publish func(Report)) {
 			}
 			if err := it.apply(&r, it.body); err != nil {
 				log.Printf("solar: %s: %v", it.name, err)
+				// Bad content (e.g. a half-written file): forget the cache
+				// validators and try again in a couple of minutes.
+				it.etag, it.modified = "", ""
+				it.next = now.Add(2 * time.Minute)
 				continue
 			}
 			changed = true
@@ -418,4 +428,14 @@ func DemoReport() Report {
 	}
 	return Report{SFI: f(127), Kp: f(1.33), KpMax24: f(3), A: f(11), HPINorth: f(15), HPISouth: f(14),
 		XRay: "B7.0", XRayRaw: f(7e-7), Kp24: kp, Updated: time.Now().UnixMilli()}
+}
+
+// completeJPEG checks the start-of-image and end-of-image markers.
+func completeJPEG(b []byte) bool {
+	if len(b) < 2048 || b[0] != 0xFF || b[1] != 0xD8 {
+		return false
+	}
+	// Allow a little trailing padding after the end marker.
+	tail := b[len(b)-min(len(b), 64):]
+	return bytes.Contains(tail, []byte{0xFF, 0xD9})
 }

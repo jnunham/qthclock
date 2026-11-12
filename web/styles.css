@@ -314,6 +314,8 @@ body.idle #mapctl { opacity: 0; pointer-events: none; }
 .space { container-type: size; }
 .sw-aurora img { max-height: none; height: 100%; width: auto; max-width: 100%; aspect-ratio: auto; object-fit: contain; border-radius: 0.4rem; }
 .sw-kp svg { max-height: none; height: 100%; }
+.sw-kpchart { flex: 1; min-height: 0; width: 100%; display: flex; }
+.sw-kpchart svg { flex: 1; }
 @container (max-width: 34rem) and (min-height: 30rem) {
   .sw-charts { grid-template-columns: 1fr; grid-template-rows: 1.1fr 1fr; }
 }

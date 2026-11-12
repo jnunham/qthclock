@@ -40,3 +40,15 @@ func TestKpNowAndXray(t *testing.T) {
 		t.Fatalf("xray: %v %q", err, r.XRay)
 	}
 }
+
+func TestCompleteJPEG(t *testing.T) {
+	full := make([]byte, 4096)
+	full[0], full[1] = 0xFF, 0xD8
+	full[len(full)-2], full[len(full)-1] = 0xFF, 0xD9
+	if !completeJPEG(full) {
+		t.Fatal("complete image rejected")
+	}
+	if completeJPEG(full[:3000]) {
+		t.Fatal("truncated image accepted")
+	}
+}
